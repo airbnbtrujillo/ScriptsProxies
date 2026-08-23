@@ -1,6 +1,6 @@
 {
   "CloudMirror": "",
-  "GitRepository": "",
+  "GitRepository": "https://github.com/airbnbtrujillo/ScriptsProxies.git",
   "GitBranch": "main",
   "AutoCheckUpdates": false,
   "UpdateChannel": "stable"

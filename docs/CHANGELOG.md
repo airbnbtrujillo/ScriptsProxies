@@ -1,5 +1,10 @@
 # Cambios
 
+## 2026.08.23.2
+
+- Se configuro GitHub como origen de actualizaciones.
+- Se agregaron instrucciones de instalacion y pull para otra computadora.
+
 ## 2026.08.23.1
 
 - Se corrigio el caracter accidental al inicio de `PROXY y GIFS.ps1`.

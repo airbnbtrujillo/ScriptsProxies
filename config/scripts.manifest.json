@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "2026.08.23.1",
+  "version": "2026.08.23.2",
   "entryPoint": "PROXY y GIFS.ps1",
   "files": [
     { "path": "PROXY y GIFS.ps1", "required": true, "role": "Orquestador principal" },

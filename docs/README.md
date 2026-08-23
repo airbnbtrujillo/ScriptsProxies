@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.23.1`.
+Version instalada: `2026.08.23.2`.
 
 ## Punto de entrada
 
@@ -41,3 +41,23 @@ Desde PowerShell:
 ```
 
 El resultado completo queda en `logs/diagnostico_*.json` cuando se usa `DIAGNOSTICO-SCRIPTS.cmd`.
+
+## Instalar en otra computadora
+
+Con Git instalado, abre PowerShell y ejecuta:
+
+```powershell
+git clone https://github.com/airbnbtrujillo/ScriptsProxies.git C:\ScriptsProxies
+cd C:\ScriptsProxies
+.\DIAGNOSTICO-SCRIPTS.cmd
+```
+
+Puedes elegir otra carpeta. Los scripts resuelven sus dependencias desde su propia ubicacion.
+
+Para recibir cambios posteriores, usa una de estas opciones:
+
+```powershell
+git -C C:\ScriptsProxies pull --ff-only
+```
+
+O ejecuta `ACTUALIZAR-SCRIPTS.cmd`. El actualizador valida primero la descarga y guarda los archivos anteriores en `archive\updates\`.
