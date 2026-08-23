@@ -11,7 +11,7 @@ pushd "%~dp0" || (
 set "_DID_PUSHD=1"
 
 REM Nombre del script PowerShell
-set "PS1=Split-GIF-AutoByFolder.ps1"
+set "PS1=GIF-02-SEPARAR-AUTOMATICO.ps1"
 
 REM Chequeo rÃ¡pido: Â¿existe el .ps1 antes de correrlo?
 if not exist "%PS1%" (

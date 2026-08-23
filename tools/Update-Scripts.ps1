@@ -72,9 +72,21 @@ try {
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
         Copy-Item -LiteralPath $source -Destination $destination -Force
     }
+    foreach ($relativeToRemove in @($sourceManifest.removeFiles)) {
+        if ([string]::IsNullOrWhiteSpace([string]$relativeToRemove)) { continue }
+        $obsolete = [IO.Path]::GetFullPath((Join-Path $rootFull ([string]$relativeToRemove)))
+        if (-not $obsolete.StartsWith(($rootFull.TrimEnd('\') + '\'), [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Ruta obsoleta fuera del destino: $relativeToRemove"
+        }
+        if (Test-Path -LiteralPath $obsolete -PathType Leaf) {
+            $backup = Join-Path $backupRoot ([string]$relativeToRemove)
+            New-Item -ItemType Directory -Path (Split-Path -Parent $backup) -Force | Out-Null
+            Copy-Item -LiteralPath $obsolete -Destination $backup -Force
+            Remove-Item -LiteralPath $obsolete -Force
+            Write-Host "[UPDATE] Archivado archivo anterior: $relativeToRemove"
+        }
+    }
     Copy-Item -LiteralPath $sourceManifestPath -Destination $localManifestPath -Force
-    $sourceVersion = Join-Path $sourceRoot 'VERSION.txt'
-    if (Test-Path $sourceVersion) { Copy-Item -LiteralPath $sourceVersion -Destination (Join-Path $rootFull 'VERSION.txt') -Force }
     Write-Host "[UPDATE] Actualizacion instalada. Respaldo: $backupRoot" -ForegroundColor Green
 } finally {
     if ($tempRoot -and (Test-Path -LiteralPath $tempRoot)) {

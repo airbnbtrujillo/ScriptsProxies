@@ -16,13 +16,14 @@ param(
 )
 
 # Validacion central antes de copiar o ejecutar cualquier script.
-$PreflightScript = Join-Path $PSScriptRoot 'tools\Test-Scripts.ps1'
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$PreflightScript = Join-Path $RepoRoot 'tools\Test-Scripts.ps1'
 if (-not $SkipPreflight -and (Test-Path -LiteralPath $PreflightScript)) {
     Write-Host "[PREFLIGHT] Validando instalacion de scripts..." -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PreflightScript -Root $PSScriptRoot -Quick
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PreflightScript -Root $RepoRoot -Quick
     $preflightCode = $LASTEXITCODE
     if ($preflightCode -ge 2) {
-        Write-Host "[PREFLIGHT][ERROR] Hay errores criticos. Ejecuta DIAGNOSTICO-SCRIPTS.cmd para ver el detalle." -ForegroundColor Red
+        Write-Host "[PREFLIGHT][ERROR] Hay errores criticos. Usa la opcion Diagnostico del menu principal." -ForegroundColor Red
         exit $preflightCode
     }
     if ($preflightCode -eq 1) {
@@ -116,42 +117,19 @@ function Invoke-Bat-Watch {
 # ================================
 # Rutas fijas de scripts origen
 # ================================
-$ScriptsRoot            = $PSScriptRoot
-$VuzeProxyScriptSrc     = Join-Path $ScriptsRoot "VUZE RAW Proxy 960x960_20fps.bat"
-$TecheProxyScriptSrc    = Join-Path $ScriptsRoot "TECHE Proxy.bat"
-$TecheSyncScriptSrc     = Join-Path $ScriptsRoot "TECHE-TimeSync.ps1"
-$GifCmdSrc              = Join-Path $ScriptsRoot "Run-GIF-Splitter.cmd"
-$GifPs1Src              = Join-Path $ScriptsRoot "Split-GIF-AutoByFolder.ps1"
-$GoProProxyScriptSrc    = Join-Path $ScriptsRoot "GoPro Proxy.bat"
-$TarsierProxyScriptSrc  = Join-Path $ScriptsRoot "Tarsier.bat"
-$Gear360ProxyScriptSrc  = Join-Path $ScriptsRoot "SamsungGear360Proxy.bat"
-$DjiOsmoProxyScriptSrc = Join-Path $ScriptsRoot "DJI OSMO RAW Proxy 960x960_20fps.bat"
-
-# --- QOOCAM Proxy (detecciÃ³n robusta) ---
-$QooProxyScriptSrc = $null
-try {
-    $cand = Get-ChildItem -LiteralPath $ScriptsRoot -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'QOOCAM.*Proxy.*\.bat$' -or $_.Name -match 'QOO.*Proxy.*\.bat$' } | Select-Object -First 1
-    if ($cand) { $QooProxyScriptSrc = $cand.FullName }
-    if (-not $QooProxyScriptSrc) {
-        $tryExact = Join-Path $ScriptsRoot "QOOCAM Proxy.bat"
-        if (Test-Path -LiteralPath $tryExact) { $QooProxyScriptSrc = $tryExact }
-    }
-} catch {}
-
-# --- INSTA EVO Proxy (detecciÃ³n robusta) ---
-$InstaEvoProxyScriptSrc = $null
-try {
-    $cand2 = Get-ChildItem -LiteralPath $ScriptsRoot -File -ErrorAction SilentlyContinue | Where-Object {
-        $_.Name -match 'INSTA.*EVO.*RAW.*Proxy.*\.bat$' -or
-        $_.Name -match 'INSTA.*EVO.*Proxy.*\.bat$'     -or
-        $_.Name -match 'EVO.*RAW.*Proxy.*\.bat$'
-    } | Select-Object -First 1
-    if ($cand2) { $InstaEvoProxyScriptSrc = $cand2.FullName }
-    if (-not $InstaEvoProxyScriptSrc) {
-        $tryExact2 = Join-Path $ScriptsRoot "INSTA EVO RAW Proxy 960x960_20fps.bat"
-        if (Test-Path -LiteralPath $tryExact2) { $InstaEvoProxyScriptSrc = $tryExact2 }
-    }
-} catch {}
+$ScriptsRoot             = Join-Path $RepoRoot '01-CAMARAS'
+$GifScriptsRoot          = Join-Path $RepoRoot '02-GIFS'
+$VuzeProxyScriptSrc      = Join-Path $ScriptsRoot 'CAM-01-VUZE-PROXY-960x960-20fps.bat'
+$QooProxyScriptSrc       = Join-Path $ScriptsRoot 'CAM-02-QOOCAM-PROXY.bat'
+$GoProProxyScriptSrc     = Join-Path $ScriptsRoot 'CAM-03-GOPRO-PROXY.bat'
+$Gear360ProxyScriptSrc   = Join-Path $ScriptsRoot 'CAM-04-GEAR360-PROXY.bat'
+$DjiOsmoProxyScriptSrc   = Join-Path $ScriptsRoot 'CAM-05-DJI-OSMO-PROXY-960x960-20fps.bat'
+$InstaEvoProxyScriptSrc  = Join-Path $ScriptsRoot 'CAM-06-INSTA-EVO-PROXY-960x960-20fps.bat'
+$TarsierProxyScriptSrc   = Join-Path $ScriptsRoot 'CAM-07-TARSIER-PROXY.bat'
+$TecheProxyScriptSrc     = Join-Path $ScriptsRoot 'CAM-08-TECHE-PROXY.bat'
+$TecheSyncScriptSrc      = Join-Path $ScriptsRoot 'CAM-08-TECHE-CORREGIR-TIEMPO.ps1'
+$GifCmdSrc               = Join-Path $GifScriptsRoot 'GIF-01-EJECUTAR-SEPARADOR.cmd'
+$GifPs1Src               = Join-Path $GifScriptsRoot 'GIF-02-SEPARAR-AUTOMATICO.ps1'
 
 # ================================
 # Definir salida del CSV

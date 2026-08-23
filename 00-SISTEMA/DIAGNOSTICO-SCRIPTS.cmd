@@ -1,7 +1,8 @@
 @echo off
 setlocal
-pushd "%~dp0" || exit /b 1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\Test-Scripts.ps1" -Root "%~dp0"
+set "ROOT=%~dp0..\"
+pushd "%ROOT%" || exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\Test-Scripts.ps1" -Root "%ROOT%"
 set "RC=%ERRORLEVEL%"
 echo.
 if %RC% GEQ 2 echo Hay errores criticos. Revisa el reporte mostrado arriba.

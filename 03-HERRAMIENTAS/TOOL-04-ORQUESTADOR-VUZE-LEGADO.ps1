@@ -13,7 +13,7 @@ Start-Transcript -LiteralPath $MainLog -Append | Out-Null
 Write-Host "[MAIN] Log general: $MainLog"
 
 # Cargar helper
-$helper = Join-Path $PSScriptRoot 'Watchdog-BAT-AutoENTER.ps1'
+$helper = Join-Path $PSScriptRoot 'TOOL-04-WATCHDOG-BAT.ps1'
 if (-not (Test-Path -LiteralPath $helper)) {
     Write-Host "[ERROR] No se encontro el helper: $helper"
     Stop-Transcript | Out-Null
@@ -26,7 +26,7 @@ $CheckMinutes = 3
 $AlsoWatch = @('ffmpeg','cmd','ffprobe','HandBrakeCLI','powershell')
 
 # Ejemplo: lanzar VUZE
-$batVuze    = Join-Path $PSScriptRoot 'VUZE RAW Proxy 960x960_20fps.bat'
+$batVuze    = Join-Path (Join-Path (Split-Path -Parent $PSScriptRoot) '01-CAMARAS') 'CAM-01-VUZE-PROXY-960x960-20fps.bat'
 $batVuzeLog = Join-Path $LogDir "VUZE_$ts.txt"
 
 $null = Invoke-BatAndAutoEnter -BatPath $batVuze `
@@ -41,7 +41,7 @@ Write-Host "[FLOW] Continue..."
 Write-Host "[FLOW] BAT log: $batVuzeLog"
 
 # (Opcional) Lanzar otro BAT, por ejemplo TECHE
-# $batTeche    = Join-Path $PSScriptRoot 'TECHE Proxy.bat'
+# TECHE ahora se ejecuta desde 01-CAMARAS/CAM-08-TECHE-PROXY.bat.
 # $batTecheLog = Join-Path $LogDir "TECHE_$ts.txt"
 # $null = Invoke-BatAndAutoEnter -BatPath $batTeche -CheckMinutes $CheckMinutes -AlsoWatch $AlsoWatch -LogFile $batTecheLog -VerboseWatch
 # Write-Host "[FLOW] Waiting for ENTER (auto or manual) to continue..."

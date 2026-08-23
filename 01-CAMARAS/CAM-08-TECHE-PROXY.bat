@@ -22,7 +22,7 @@ set "TEMP_DIR=%ROOT%\_temp_proxies"
 set "CANONICAL_SUFFIX=__TecheMain_proxy.mp4"
 set "LEGACY_SUFFIX= TECHEProxy.mp4"
 set "PROXY_SUFFIX=%CANONICAL_SUFFIX%"
-set "PS_SYNC=%ROOT%\TECHE-TimeSync.ps1"
+set "PS_SYNC=%ROOT%\CAM-08-TECHE-CORREGIR-TIEMPO.ps1"
 set "SYNC_REPORT=%PROJECT_DIR%\TECHE TimeSync Report.csv"
 set "PROXY_MAP=%PROJECT_DIR%\TECHE Main-Proxy Map.csv"
 
@@ -104,7 +104,7 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
         goto END
       )
     ) else (
-      call :LOG WARN "No existe TECHE-TimeSync.ps1; usando modo compatible sin correccion"
+      call :LOG WARN "No existe CAM-08-TECHE-CORREGIR-TIEMPO.ps1; usando modo compatible sin correccion"
       if not exist "!PROXY!" (
         call :LOG INFO "[ENCODE] !BASE! hacia !PROXY!"
         "%FFMPEG%" -y -hide_banner -loglevel warning -stats -analyzeduration 100M -probesize 100M ^

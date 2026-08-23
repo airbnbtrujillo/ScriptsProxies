@@ -4,7 +4,7 @@ REM Lanza el extractor de candidatos de thumbnail usando proxies.
 REM Si lo ejecutas desde I:\Resources\Scripts, te pedira la carpeta del proyecto.
 
 set "SCRIPT_DIR=%~dp0"
-set "PS1=%SCRIPT_DIR%Extract-Thumbnail-Candidates.ps1"
+set "PS1=%SCRIPT_DIR%TOOL-01-EXTRAER-MINIATURAS.ps1"
 set "ROOT=%~1"
 
 if not exist "%PS1%" (

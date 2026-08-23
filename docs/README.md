@@ -1,63 +1,52 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.23.2`.
+Version instalada: `2026.08.23.3`.
 
-## Punto de entrada
+## Inicio rapido
 
-`PROXY y GIFS.ps1` sigue siendo el orquestador principal. Los nombres de los scripts activos permanecen en la raiz para conservar compatibilidad con proyectos y copias antiguas.
+En la raiz solo se usa `INICIAR-PROXY-Y-GIFS.cmd`. Al abrirlo aparece un menu para:
 
-Lanzadores recomendados:
+1. Procesar todos los proyectos y camaras.
+2. Ejecutar solamente una camara.
+3. Generar solamente los GIFs.
+4. Ejecutar el diagnostico sin renderizar.
+5. Descargar la version mas reciente desde GitHub.
 
-- `INICIAR-PROXY-Y-GIFS.cmd`: ejecuta el flujo normal.
-- `DIAGNOSTICO-SCRIPTS.cmd`: revisa archivos, sintaxis y herramientas sin renderizar.
-- `ACTUALIZAR-SCRIPTS.cmd`: instala una version validada desde el origen configurado y guarda respaldo.
+Para una sola camara, selecciona la opcion 2 y pega la ruta exacta de su carpeta, por ejemplo `100GOPRO`, `CAM_001`, `100QOOCAM` o una ruta de red `\\servidor\carpeta`.
 
-## Estructura
+## Estructura identificable
 
-- `config/`: manifiesto, version y origen de actualizaciones.
-- `tools/`: diagnostico y actualizador.
-- `docs/`: documentacion.
-- `archive/`: respaldos manuales y copias previas a actualizaciones.
-- `logs/`: reportes de diagnostico y ejecucion.
-- `OLD/`: versiones historicas anteriores.
+- `00-SISTEMA`: menu, orquestador, diagnostico y actualizacion.
+- `01-CAMARAS`: scripts con prefijo `CAM-01` a `CAM-09`.
+- `02-GIFS`: scripts con prefijo `GIF`.
+- `03-HERRAMIENTAS`: utilidades con prefijo `TOOL`.
+- `config`: manifiesto y configuracion local.
+- `tools`: motores internos de diagnostico y actualizacion.
+- `archive`: respaldos recuperables de actualizaciones.
+- `logs`: reportes de diagnostico.
 
-## Nube
-
-La ejecucion siempre se realiza desde la copia local estable `F:\Scripts`. No se recomienda ejecutar directamente desde una carpeta que se este sincronizando mientras FFmpeg trabaja.
-
-Configura uno de estos campos en `config/settings.json`:
-
-- `GitRepository`: URL de un repositorio Git privado. Es la opcion recomendada porque conserva historial y permite volver a una version anterior.
-- `CloudMirror`: ruta local sincronizada por OneDrive, Dropbox o Google Drive que contenga una copia completa de esta estructura.
-
-El actualizador descarga o lee primero en una ubicacion separada, ejecuta el diagnostico y solo entonces copia los archivos. Antes de reemplazar algo crea un respaldo en `archive/updates/`.
-
-## Debugging sin render
-
-Desde PowerShell:
-
-```powershell
-& 'F:\Scripts\PROXY y GIFS.ps1' -PreflightOnly
-```
-
-El resultado completo queda en `logs/diagnostico_*.json` cuando se usa `DIAGNOSTICO-SCRIPTS.cmd`.
+El modo de una sola camara copia unicamente el script seleccionado a la carpeta indicada y lo ejecuta ahi. No revisa ni procesa las demas camaras. Las rutas UNC y las unidades de red siguen admitidas mediante `pushd` y operaciones con rutas literales.
 
 ## Instalar en otra computadora
-
-Con Git instalado, abre PowerShell y ejecuta:
 
 ```powershell
 git clone https://github.com/airbnbtrujillo/ScriptsProxies.git C:\ScriptsProxies
 cd C:\ScriptsProxies
-.\DIAGNOSTICO-SCRIPTS.cmd
+.\INICIAR-PROXY-Y-GIFS.cmd
 ```
 
-Puedes elegir otra carpeta. Los scripts resuelven sus dependencias desde su propia ubicacion.
-
-Para recibir cambios posteriores, usa una de estas opciones:
+Para actualizar posteriormente, abre el mismo lanzador y elige la opcion 5, o usa:
 
 ```powershell
 git -C C:\ScriptsProxies pull --ff-only
 ```
 
-O ejecuta `ACTUALIZAR-SCRIPTS.cmd`. El actualizador valida primero la descarga y guarda los archivos anteriores en `archive\updates\`.
+El actualizador valida la descarga y guarda los archivos reemplazados o retirados en `archive\updates`.
+
+## Diagnostico sin render
+
+Desde el menu principal usa la opcion 4. Desde PowerShell tambien puedes ejecutar:
+
+```powershell
+& 'C:\ScriptsProxies\tools\Test-Scripts.ps1' -Root 'C:\ScriptsProxies'
+```
