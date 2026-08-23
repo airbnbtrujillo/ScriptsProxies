@@ -54,6 +54,7 @@ try {
     $backupRoot = Join-Path $rootFull ("archive\updates\{0}" -f (Get-Date -Format 'yyyyMMdd_HHmmss'))
     New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
     foreach ($entry in $sourceManifest.files) {
+        if ($null -ne $entry.update -and -not [bool]$entry.update) { continue }
         $relative = [string]$entry.path
         $source = [IO.Path]::GetFullPath((Join-Path $sourceRoot $relative))
         $destination = [IO.Path]::GetFullPath((Join-Path $rootFull $relative))

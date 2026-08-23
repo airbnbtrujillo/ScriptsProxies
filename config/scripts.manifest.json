@@ -20,9 +20,19 @@
     { "path": "Run-Thumbnail-Candidates.cmd", "required": false, "role": "Lanzador miniaturas" },
     { "path": "PicsProxyCollector.ps1", "required": false, "role": "Recolector de imagenes" },
     { "path": "Copy Bacbkups.ps1", "required": false, "role": "Copias finales" },
+    { "path": "Orquestador.ps1", "required": false, "role": "Orquestador legado VUZE" },
+    { "path": "Watchdog-BAT-AutoENTER.ps1", "required": false, "role": "Watchdog legado" },
+    { "path": "Verificador_FilaUnica_FIX.ps1", "required": false, "role": "Verificador fila unica" },
+    { "path": "Verificador_FilaUnica_LANZAR.bat", "required": false, "role": "Lanzador verificador" },
+    { "path": "DIAGNOSTICO-SCRIPTS.cmd", "required": true, "role": "Lanzador diagnostico" },
+    { "path": "ACTUALIZAR-SCRIPTS.cmd", "required": true, "role": "Lanzador actualizador" },
+    { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Lanzador principal" },
     { "path": "tools/Test-Scripts.ps1", "required": true, "role": "Diagnostico" },
     { "path": "tools/Update-Scripts.ps1", "required": true, "role": "Actualizador seguro" },
-    { "path": "config/settings.json", "required": true, "role": "Configuracion" },
+    { "path": "docs/README.md", "required": true, "role": "Documentacion" },
+    { "path": "docs/CHANGELOG.md", "required": true, "role": "Historial de cambios" },
+    { "path": ".gitignore", "required": true, "role": "Exclusiones Git" },
+    { "path": "config/settings.json", "required": true, "role": "Configuracion local", "update": false },
     { "path": "VERSION.txt", "required": true, "role": "Version instalada" }
   ]
 }
