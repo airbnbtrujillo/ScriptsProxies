@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "version": "2026.08.23.1",
+  "entryPoint": "PROXY y GIFS.ps1",
+  "files": [
+    { "path": "PROXY y GIFS.ps1", "required": true, "role": "Orquestador principal" },
+    { "path": "VUZE RAW Proxy 960x960_20fps.bat", "required": true, "role": "Proxy VUZE" },
+    { "path": "QOOCAM Proxy.bat", "required": true, "role": "Proxy QOOCAM" },
+    { "path": "GoPro Proxy.bat", "required": true, "role": "Proxy GoPro" },
+    { "path": "SamsungGear360Proxy.bat", "required": true, "role": "Proxy Gear 360" },
+    { "path": "DJI OSMO RAW Proxy 960x960_20fps.bat", "required": true, "role": "Proxy DJI OSMO" },
+    { "path": "INSTA EVO RAW Proxy 960x960_20fps.bat", "required": true, "role": "Proxy Insta EVO" },
+    { "path": "Tarsier.bat", "required": true, "role": "Proxy Tarsier" },
+    { "path": "TECHE Proxy.bat", "required": true, "role": "Proxy TECHE" },
+    { "path": "TECHE-TimeSync.ps1", "required": true, "role": "Correccion temporal TECHE" },
+    { "path": "Run-GIF-Splitter.cmd", "required": true, "role": "Lanzador GIF" },
+    { "path": "Split-GIF-AutoByFolder.ps1", "required": true, "role": "Separador GIF" },
+    { "path": "InstaGo3.bat", "required": false, "role": "Proxy Insta GO 3" },
+    { "path": "Extract-Thumbnail-Candidates.ps1", "required": false, "role": "Miniaturas" },
+    { "path": "Run-Thumbnail-Candidates.cmd", "required": false, "role": "Lanzador miniaturas" },
+    { "path": "PicsProxyCollector.ps1", "required": false, "role": "Recolector de imagenes" },
+    { "path": "Copy Bacbkups.ps1", "required": false, "role": "Copias finales" },
+    { "path": "tools/Test-Scripts.ps1", "required": true, "role": "Diagnostico" },
+    { "path": "tools/Update-Scripts.ps1", "required": true, "role": "Actualizador seguro" },
+    { "path": "config/settings.json", "required": true, "role": "Configuracion" },
+    { "path": "VERSION.txt", "required": true, "role": "Version instalada" }
+  ]
+}

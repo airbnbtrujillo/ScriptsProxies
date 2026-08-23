@@ -1,0 +1,7 @@
+{
+  "CloudMirror": "",
+  "GitRepository": "",
+  "GitBranch": "main",
+  "AutoCheckUpdates": false,
+  "UpdateChannel": "stable"
+}

@@ -1,0 +1,13 @@
+logs/
+Scripts Pics/
+archive/
+OLD/
+*.bak*
+*.partial.*
+*_debug.log
+ScanReport_*.csv
+_to_concat.txt
+overlay.ass
+overlay.srt
+filelist*.txt
+__pycache__/
