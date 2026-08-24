@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.08.24.1",
+  "version": "2026.08.24.2",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },
@@ -31,6 +31,7 @@
     { "path": "03-HERRAMIENTAS/TOOL-05-EJECUTAR-VERIFICADOR.bat", "required": false, "role": "Lanzador verificador" },
     { "path": "03-HERRAMIENTAS/TOOL-05-VERIFICAR-FILA-UNICA.ps1", "required": false, "role": "Verificador fila unica" },
     { "path": "tools/Test-Scripts.ps1", "required": true, "role": "Motor de diagnostico" },
+    { "path": "tools/Test-ProxyIntegrity.ps1", "required": true, "role": "Verificador de integridad y cambios de originales" },
     { "path": "tools/Update-Scripts.ps1", "required": true, "role": "Actualizador seguro" },
     { "path": "docs/README.md", "required": true, "role": "Documentacion" },
     { "path": "docs/CHANGELOG.md", "required": true, "role": "Historial" },

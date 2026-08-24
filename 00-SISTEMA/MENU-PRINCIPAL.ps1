@@ -19,9 +19,10 @@ while ($true) {
     Write-Host ' 1. Procesar todos los proyectos y camaras'
     Write-Host ' 2. Ejecutar una sola camara'
     Write-Host ' 3. Generar GIFs para un proyecto'
-    Write-Host ' 4. Diagnostico (no renderiza)'
-    Write-Host ' 5. Actualizar desde GitHub'
-    Write-Host ' 6. Herramientas adicionales'
+    Write-Host ' 4. Verificar integridad de proxies (no renderiza)'
+    Write-Host ' 5. Diagnostico de instalacion (no renderiza)'
+    Write-Host ' 6. Actualizar desde GitHub'
+    Write-Host ' 7. Herramientas adicionales'
     Write-Host ' 0. Salir'
     Write-Host ''
     $choice = Read-Host 'Selecciona una opcion'
@@ -31,9 +32,10 @@ while ($true) {
             '1' { [void](Invoke-PowerShellFile '00-SISTEMA\ORQUESTADOR-PRINCIPAL.ps1') }
             '2' { [void](Invoke-PowerShellFile '00-SISTEMA\EJECUTAR-UNA-CAMARA.ps1') }
             '3' { [void](Invoke-PowerShellFile '00-SISTEMA\EJECUTAR-GIFS.ps1') }
-            '4' { & (Join-Path $Root '00-SISTEMA\DIAGNOSTICO-SCRIPTS.cmd') }
-            '5' { & (Join-Path $Root '00-SISTEMA\ACTUALIZAR-SCRIPTS.cmd') }
-            '6' {
+            '4' { [void](Invoke-PowerShellFile 'tools\Test-ProxyIntegrity.ps1') }
+            '5' { & (Join-Path $Root '00-SISTEMA\DIAGNOSTICO-SCRIPTS.cmd') }
+            '6' { & (Join-Path $Root '00-SISTEMA\ACTUALIZAR-SCRIPTS.cmd') }
+            '7' {
                 Write-Host ''
                 Write-Host 'Herramientas disponibles en:' -ForegroundColor Cyan
                 Write-Host (Join-Path $Root '03-HERRAMIENTAS')

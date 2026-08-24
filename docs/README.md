@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.24.1`.
+Version instalada: `2026.08.24.2`.
 
 ## Inicio rapido
 
@@ -9,8 +9,9 @@ En la raiz solo se usa `INICIAR-PROXY-Y-GIFS.cmd`. Al abrirlo aparece un menu pa
 1. Procesar todos los proyectos y camaras.
 2. Ejecutar solamente una camara.
 3. Generar solamente los GIFs.
-4. Ejecutar el diagnostico sin renderizar.
-5. Descargar la version mas reciente desde GitHub.
+4. Verificar integridad sin renderizar.
+5. Ejecutar el diagnostico de instalacion.
+6. Descargar la version mas reciente desde GitHub.
 
 Para una sola camara, selecciona la opcion 2 y pega la ruta exacta de su carpeta, por ejemplo `100GOPRO`, `CAM_001`, `100QOOCAM` o una ruta de red `\\servidor\carpeta`.
 
@@ -26,6 +27,20 @@ Para una sola camara, selecciona la opcion 2 y pega la ruta exacta de su carpeta
 - `logs`: reportes de diagnostico.
 
 El modo de una sola camara copia unicamente el script seleccionado a la carpeta indicada y lo ejecuta ahi. No revisa ni procesa las demas camaras. Las rutas UNC y las unidades de red siguen admitidas mediante `pushd` y operaciones con rutas literales.
+
+## Integridad y recuperacion automatica
+
+Antes de `Procesar todo`, el sistema compara el inventario actual de originales con el inventario de la ejecucion anterior. Tambien abre con `ffprobe` los originales, proxies y finales para detectar videos ilegibles o truncados, archivos `.partial.mp4`, cantidades diferentes y duraciones finales incompatibles con sus partes.
+
+- Si cambio un original, se prepara solamente su camara.
+- Si se retiraron todos los originales de una camara registrada, sus resultados anteriores se apartan y la camara queda bloqueada hasta que vuelvan los originales correctos.
+- Si fallo un proxy individual, se apartan ese proxy y el final para reconstruirlos.
+- Si solo fallo el final, se conservan los proxies intermedios y se reconstruye el final.
+- Si un original esta ilegible, la reparacion de esa camara se bloquea y conserva sus resultados hasta que el original sea revisado.
+- Los archivos apartados no se borran: quedan en `archive\proxy-integrity` dentro del proyecto.
+- El inventario compartido queda en `.proxy-integrity` dentro del proyecto, por lo que funciona aunque otra computadora vea el disco con una letra diferente.
+
+La opcion 4 del menu ejecuta una revision informativa sin renderizar ni apartar archivos. La opcion 1 realiza esta revision automaticamente y prepara las reparaciones antes del flujo normal.
 
 ## Instalar en otra computadora
 

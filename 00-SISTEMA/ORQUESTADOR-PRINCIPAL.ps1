@@ -58,6 +58,26 @@ if (-not (Test-Path -LiteralPath $RootPath)) {
     exit 1
 }
 
+# Antes de decidir que finales se pueden saltar, comprobar que los originales,
+# proxies intermedios y finales siguen siendo coherentes. Los archivos dudosos
+# se apartan de forma recuperable; los bloques normales de cada camara crean
+# despues solamente lo que haya quedado pendiente.
+$IntegrityScript = Join-Path $RepoRoot 'tools\Test-ProxyIntegrity.ps1'
+if (Test-Path -LiteralPath $IntegrityScript -PathType Leaf) {
+    Write-Host '[INTEGRIDAD] Verificando cambios, parciales y videos corruptos...' -ForegroundColor Cyan
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $IntegrityScript -RootPath $RootPath -Repair
+    $integrityCode = $LASTEXITCODE
+    if ($integrityCode -ge 2) {
+        Write-Host '[INTEGRIDAD][ERROR] La validacion no pudo completarse con seguridad; se detiene el procesamiento.' -ForegroundColor Red
+        exit $integrityCode
+    }
+    if ($integrityCode -eq 1) {
+        Write-Host '[INTEGRIDAD] Se prepararon solamente las camaras afectadas para su reconstruccion.' -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "[INTEGRIDAD][AVISO] No existe $IntegrityScript; continuo en modo compatible." -ForegroundColor Yellow
+}
+
 Write-Host "===== RUN START ====="
 Write-Host "RootPath = $RootPath"
 
@@ -112,6 +132,13 @@ function Invoke-Bat-Watch {
         $p2 = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
         if (-not $p2 -and $proc.HasExited) { Write-Host ("[WATCH] ExitCode del cmd: {0}" -f $proc.ExitCode) }
     } catch {}
+}
+
+function Test-CameraIntegrityBlocked {
+    param([string]$ProjectPath,[string]$CameraId)
+    $statePath=Join-Path $ProjectPath ('.proxy-integrity\{0}.json' -f $CameraId)
+    if(-not(Test-Path -LiteralPath $statePath -PathType Leaf)){return $false}
+    try{return [bool](Get-Content -LiteralPath $statePath -Raw|ConvertFrom-Json).Blocked}catch{return $false}
 }
 
 # ================================
@@ -171,6 +198,14 @@ foreach ($proj in $projectFolders) {
 
     $projName = $proj.Name
     $projPath = $proj.FullName
+    $blockedVuze    = Test-CameraIntegrityBlocked $projPath 'CAM-01'
+    $blockedQoo     = Test-CameraIntegrityBlocked $projPath 'CAM-02'
+    $blockedGopro   = Test-CameraIntegrityBlocked $projPath 'CAM-03'
+    $blockedGear    = Test-CameraIntegrityBlocked $projPath 'CAM-04'
+    $blockedDji     = Test-CameraIntegrityBlocked $projPath 'CAM-05'
+    $blockedInsta   = Test-CameraIntegrityBlocked $projPath 'CAM-06'
+    $blockedTarsier = Test-CameraIntegrityBlocked $projPath 'CAM-07'
+    $blockedTeche   = Test-CameraIntegrityBlocked $projPath 'CAM-08'
 
     # -------------------------
     # Paths base dentro del proyecto
@@ -244,7 +279,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE VUZE PROXY
     # =====================================
-    if ($hasVuzeDir) {
+    if ($blockedVuze) {
+        Write-Host ' [VUZE][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasVuzeDir) {
         Write-Host " [VUZE] Carpeta 100VUZXR encontrada."
         if (-not $hasVuzeComplete) {
             Write-Host " [VUZE] Falta '*VUZE RAW PROXY Complete*' en la raÃ­z del proyecto."
@@ -271,7 +308,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE QOOCAM (copiar y EJECUTAR solo si existe 100QOOCAM; NO crear)
     # =====================================
-    if ($hasQooDir) {
+    if ($blockedQoo) {
+        Write-Host ' [QOO][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasQooDir) {
         Write-Host " [QOO] Carpeta 100QOOCAM encontrada."
         if ($QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
             $dstQooScript = Join-Path $qooDirPath (Split-Path $QooProxyScriptSrc -Leaf)
@@ -295,7 +334,9 @@ foreach ($proj in $projectFolders) {
 	    # =====================================
     # BLOQUE TARSIER (copiar y EJECUTAR solo si existe TARSIER; NO crear)
     # =====================================
-    if ($hasTarsierDir) {
+    if ($blockedTarsier) {
+        Write-Host ' [TARSIER][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasTarsierDir) {
         Write-Host " [TARSIER] Carpeta TARSIER encontrada."
         if (-not $hasTarsierComplete) {
 		if ($TarsierProxyScriptSrc -and (Test-Path -LiteralPath $TarsierProxyScriptSrc)) {
@@ -327,7 +368,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE GOPRO (100GOPRO)
     # =====================================
-    if ($hasGoproDir) {
+    if ($blockedGopro) {
+        Write-Host ' [GOPRO][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasGoproDir) {
         Write-Host " [GOPRO] Carpeta 100GOPRO encontrada."
         if (-not $hasGoproComplete) {
             if ($GoProProxyScriptSrc -and (Test-Path -LiteralPath $GoProProxyScriptSrc)) {
@@ -358,7 +401,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE GEAR 360 (101PHOTO)
     # =====================================
-    if ($hasGearDir) {
+    if ($blockedGear) {
+        Write-Host ' [GEAR360][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasGearDir) {
         Write-Host " [GEAR360] Carpeta 101PHOTO encontrada."
         if (-not $hasGearComplete) {
             if ($Gear360ProxyScriptSrc -and (Test-Path -LiteralPath $Gear360ProxyScriptSrc)) {
@@ -389,7 +434,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE DJI OSMO 360 (CAM_001)
     # =====================================
-    if ($hasDjiOsmoDir) {
+    if ($blockedDji) {
+        Write-Host ' [DJI OSMO][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasDjiOsmoDir) {
         Write-Host " [DJI OSMO] Carpeta CAM_001 encontrada."
         if (-not $hasDjiOsmoComplete) {
             if ($DjiOsmoProxyScriptSrc -and (Test-Path -LiteralPath $DjiOsmoProxyScriptSrc)) {
@@ -418,7 +465,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE INSTA EVO (GENÃ‰RICO POR PROYECTO)
     # =====================================
-    if (-not $hasInstaComplete) {
+    if ($blockedInsta) {
+        Write-Host ' [INSTA][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif (-not $hasInstaComplete) {
         if (Test-Path -LiteralPath $instaCam01Dir) {
             if ($InstaEvoProxyScriptSrc -and (Test-Path -LiteralPath $InstaEvoProxyScriptSrc)) {
                 $dstInstaEvoScript = Join-Path $instaCam01Dir (Split-Path $InstaEvoProxyScriptSrc -Leaf)
@@ -448,7 +497,9 @@ foreach ($proj in $projectFolders) {
     # =====================================
     # BLOQUE TECHE PROXY
     # =====================================
-    if ($hasDateDir) {
+    if ($blockedTeche) {
+        Write-Host ' [TECHE][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
+    } elseif ($hasDateDir) {
         Write-Host " [TECHE] Carpeta(s) fecha encontrada(s): $dateDirNames"
         if (-not $hasTecheComplete) {
             Write-Host " [TECHE] Falta '*TECHE RAW PROXY Complete*' en la raÃ­z del proyecto."

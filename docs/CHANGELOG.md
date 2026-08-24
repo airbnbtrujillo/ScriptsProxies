@@ -1,5 +1,15 @@
 # Cambios
 
+## 2026.08.24.2
+
+- Se agrego verificacion comun de integridad para VUZE, QOOCAM, GoPro, Gear 360, DJI OSMO, Insta EVO, Tarsier, TECHE e Insta GO 3.
+- Se guarda un inventario compartido de rutas, tamanos y fechas de originales para detectar archivos movidos, agregados, eliminados o modificados.
+- Si desaparecen todos los originales de una camara ya registrada, sus resultados obsoletos se archivan y esa camara queda bloqueada de forma segura.
+- Se detectan proxies y finales corruptos, parciales, cantidades incoherentes y duraciones finales incompatibles.
+- La reparacion automatica afecta solamente la camara necesaria y conserva los demas resultados.
+- Los archivos dudosos se trasladan a un archivo recuperable en vez de eliminarse definitivamente.
+- El flujo completo ejecuta esta comprobacion antes de decidir que camaras debe saltar.
+
 ## 2026.08.24.1
 
 - TECHE prueba el codificador NVIDIA con una codificacion real y usa CPU si la GPU no funciona.
