@@ -21,7 +21,10 @@ function Get-MediaInfo([string] $Path) {
     if ($LASTEXITCODE -ne 0 -or -not $json) { throw "ffprobe no pudo leer: $Path" }
     $data = $json | ConvertFrom-Json
     $stream = @($data.streams)[0]
-    $durationText = if ($stream.duration) { $stream.duration } else { $data.format.duration }
+    # La duracion del contenedor incluye correctamente la cola de audio/video.
+    # Algunos clips TECHE muy cortos declaran pocos frames en la pista, aunque
+    # el MP4 completo tenga la duracion correcta.
+    $durationText = if ($data.format.duration) { $data.format.duration } else { $stream.duration }
     $duration = 0.0
     if (-not [double]::TryParse([string]$durationText, [Globalization.NumberStyles]::Float, $Invariant, [ref]$duration)) {
         throw "Duracion no disponible: $Path"
@@ -85,7 +88,7 @@ if ($needsCorrection -and -not $withinGuard) {
 }
 
 $state = [ordered]@{
-    Version = 2
+    Version = 3
     ClipId = Split-Path $Folder -Leaf
     MainPath = if ($raw) { $raw.FullName } else { $null }
     MainFileName = if ($raw) { $raw.Name } else { $null }
@@ -117,13 +120,13 @@ if ((Test-Path -LiteralPath $Output -PathType Leaf) -and (Test-Path -LiteralPath
     } catch { $canKeep = $false }
 }
 
-# Adopta proxies antiguos que ya tienen la duracion y dimensiones correctas.
+# Adopta proxies nuevos que ya tienen la duracion y dimensiones del preview.
 # Asi, instalar esta mejora no obliga a renderizar nuevamente todo el archivo.
 if (-not $canKeep -and (Test-Path -LiteralPath $Output -PathType Leaf)) {
     try {
         $existingInfo = Get-MediaInfo $Output
         $adoptionTolerance = [Math]::Max($ToleranceSeconds, 1.0 / 30.0 + 0.01)
-        if ($existingInfo.Width -eq 960 -and $existingInfo.Height -eq 960 -and
+        if ($existingInfo.Width -eq $previewInfo.Width -and $existingInfo.Height -eq $previewInfo.Height -and
             [Math]::Abs($existingInfo.Duration - $targetDuration) -le $adoptionTolerance) {
             $state.OutputDuration = $existingInfo.Duration
             $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Sidecar -Encoding UTF8
@@ -143,40 +146,59 @@ if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path 
 $tempOutput = Join-Path $outDir (([IO.Path]::GetFileNameWithoutExtension($Output)) + '.partial.mp4')
 Remove-Item -LiteralPath $tempOutput -Force -ErrorAction SilentlyContinue
 
-$baseVideo = 'crop=iw/2:ih:0:0,scale=960:960:force_original_aspect_ratio=decrease,pad=960:960:(ow-iw)/2:(oh-ih)/2,fps=30'
-$ratio = if ($previewInfo.Duration -gt 0) { $targetDuration / $previewInfo.Duration } else { 1.0 }
-$videoFilter = if ($needsCorrection) { "$baseVideo,setpts=PTS*$($ratio.ToString('0.############',$Invariant))" } else { $baseVideo }
 $hasAudio = Test-HasAudio $previewFull
 
-$codec = if (Test-VideoEncoder 'h264_nvenc') { 'h264_nvenc' } else { 'libx264' }
-Write-Host ("[CODEC] {0}" -f $codec)
-$videoArgs = if ($codec -eq 'h264_nvenc') {
-    @('-c:v',$codec,'-cq','23','-b:v','2500k','-maxrate','5000k','-bufsize','5000k','-preset','slow')
+# El preview y el main TECHE empiezan con la misma marca de tiempo. La diferencia
+# observada esta al final: nunca se estira ni se acelera el contenido completo.
+# Si el preview alcanza o sobra, solo se remultiplexa/recorta con stream copy.
+# Unicamente cuando falta tiempo se codifica el preview ligero y se agrega negro
+# al final. En CPU se usa ultrafast para evitar velocidades como 0.08x.
+$durationArg = $targetDuration.ToString('0.############',$Invariant)
+$paddingSeconds = [Math]::Max(0.0, $difference)
+if ([Math]::Abs($difference) -le $ToleranceSeconds) {
+    $mode = 'COPIA-DIRECTA'
+    Copy-Item -LiteralPath $previewFull -Destination $tempOutput -Force
+    $args = $null
+    $state.CorrectionMode = $mode
+    $state.PaddingEndSeconds = 0.0
+} elseif ($difference -lt 0) {
+    $mode = 'RECORTA-COPIA'
+    $args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
+        '-map','0:v:0','-map','0:a?','-c','copy','-t',$durationArg,'-movflags','+faststart',$tempOutput)
+    $state.CorrectionMode = $mode
+    $state.PaddingEndSeconds = 0.0
 } else {
-    @('-c:v',$codec,'-crf','23','-preset','medium')
-}
-
-$args = @('-y','-hide_banner','-loglevel','warning','-stats','-analyzeduration','100M','-probesize','100M','-i',$previewFull,
-    '-map','0:v:0','-vf',$videoFilter) + $videoArgs + @('-pix_fmt','yuv420p')
-if ($hasAudio) {
-    if ($needsCorrection) {
-        $tempo = $previewInfo.Duration / $targetDuration
-        $audioFilter = 'atempo=' + $tempo.ToString('0.############',$Invariant) + ',apad,atrim=duration=' + $targetDuration.ToString('0.############',$Invariant)
-        $args += @('-map','0:a:0','-af',$audioFilter)
+    $mode = 'NEGRO-AL-FINAL'
+    $codec = if (Test-VideoEncoder 'h264_nvenc') { 'h264_nvenc' } else { 'libx264' }
+    $videoArgs = if ($codec -eq 'h264_nvenc') {
+        @('-c:v',$codec,'-preset','p1','-cq','28','-b:v','0')
     } else {
-        $args += @('-map','0:a:0')
+        @('-c:v',$codec,'-preset','ultrafast','-crf','28','-tune','fastdecode')
     }
-    $args += @('-c:a','aac','-b:a','32k','-ar','16000','-ac','1')
-} else {
-    $args += '-an'
+    $padArg = $paddingSeconds.ToString('0.############',$Invariant)
+    $videoFilter = 'tpad=stop_mode=add:color=black:stop_duration=' + $padArg + ',format=yuv420p'
+    $args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
+        '-map','0:v:0','-vf',$videoFilter) + $videoArgs + @('-pix_fmt','yuv420p')
+    if ($hasAudio) {
+        $audioFilter = 'apad=pad_dur=' + $padArg + ',atrim=duration=' + $durationArg
+        $args += @('-map','0:a:0','-af',$audioFilter,'-c:a','aac','-b:a','96k')
+    } else {
+        $args += '-an'
+    }
+    $args += @('-t',$durationArg,'-movflags','+faststart',$tempOutput)
+    $state.CorrectionMode = $mode
+    $state.PaddingEndSeconds = $paddingSeconds
+    $state.VideoEncoder = $codec
+    Write-Host ("[CODEC RAPIDO] {0}" -f $codec)
 }
-$args += @('-t',$targetDuration.ToString('0.############',$Invariant),'-movflags','+faststart',$tempOutput)
 
-$mode = if ($needsCorrection) { 'CORRIGE' } else { 'NORMAL' }
 Write-Host ('[{0}] {1} | preview={2:N3}s referencia={3:N3}s desfase={4:+0.000;-0.000;0.000}s' -f `
     $mode, (Split-Path $Folder -Leaf), $previewInfo.Duration, $targetDuration, $difference)
-& $FFmpeg @args
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $tempOutput)) { throw "ffmpeg fallo creando $Output" }
+if ($args) {
+    & $FFmpeg @args
+    if ($LASTEXITCODE -ne 0) { throw "ffmpeg fallo creando $Output" }
+}
+if (-not (Test-Path -LiteralPath $tempOutput)) { throw "No se pudo crear $Output" }
 
 $outputInfo = Get-MediaInfo $tempOutput
 $validationTolerance = [Math]::Max($ToleranceSeconds, 1.0 / 30.0 + 0.01)

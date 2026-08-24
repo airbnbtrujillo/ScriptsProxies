@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.24.2`.
+Version instalada: `2026.08.24.3`.
 
 ## Inicio rapido
 
@@ -42,6 +42,17 @@ Antes de `Procesar todo`, el sistema compara el inventario actual de originales 
 
 La opcion 4 del menu ejecuta una revision informativa sin renderizar ni apartar archivos. La opcion 1 realiza esta revision automaticamente y prepara las reparaciones antes del flujo normal.
 
+## TECHE rapido
+
+TECHE utiliza directamente `TechePrev.mp4`, que ya tiene la misma proporcion que `TecheMain.mp4`, sin decodificar el archivo 8K. No altera la velocidad del contenido:
+
+- Si las duraciones coinciden, copia el preview directamente.
+- Si el preview es mas largo, recorta el final por copia rapida.
+- Si es mas corto, agrega solamente el tiempo faltante como negro al final.
+- El final se une sin recodificar todos los clips nuevamente.
+
+El reporte `TECHE TimeSync Report.csv` indica para cada clip si fue copia directa, recorte o agregado de negro. El mapa `TECHE Main-Proxy Map.csv` conserva la correspondencia exacta entre el main y su proxy para Premiere.
+
 ## Instalar en otra computadora
 
 ```powershell
@@ -50,7 +61,7 @@ cd C:\ScriptsProxies
 .\INICIAR-PROXY-Y-GIFS.cmd
 ```
 
-Para actualizar posteriormente, abre el mismo lanzador y elige la opcion 5, o usa:
+Para actualizar posteriormente, abre el mismo lanzador y elige la opcion 6, o usa:
 
 ```powershell
 git -C C:\ScriptsProxies pull --ff-only
@@ -60,7 +71,7 @@ El actualizador valida la descarga y guarda los archivos reemplazados o retirado
 
 ## Diagnostico sin render
 
-Desde el menu principal usa la opcion 4. Desde PowerShell tambien puedes ejecutar:
+Desde el menu principal usa la opcion 5. Desde PowerShell tambien puedes ejecutar:
 
 ```powershell
 & 'C:\ScriptsProxies\tools\Test-Scripts.ps1' -Root 'C:\ScriptsProxies'

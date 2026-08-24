@@ -1,5 +1,14 @@
 # Cambios
 
+## 2026.08.24.3
+
+- TECHE usa directamente el preview 1920x960 completo y deja de recortar media imagen.
+- Ya no estira ni acelera el contenido para corregir diferencias de duracion.
+- Las coincidencias se copian, los sobrantes se recortan sin recodificar y los faltantes se completan con negro al final.
+- El final TECHE se concatena por stream copy y evita un segundo render completo por el rotulo.
+- El modo CPU usa `ultrafast` y el modo NVIDIA usa el preset rapido `p1`.
+- El reporte temporal indica el metodo aplicado y la cantidad de negro agregada.
+
 ## 2026.08.24.2
 
 - Se agrego verificacion comun de integridad para VUZE, QOOCAM, GoPro, Gear 360, DJI OSMO, Insta EVO, Tarsier, TECHE e Insta GO 3.

@@ -56,27 +56,23 @@ set "V_CODEC=h264_nvenc"
 %FFMPEG% -hide_banner -v error -f lavfi -i "color=size=256x256:rate=1:duration=0.1" -frames:v 1 -c:v h264_nvenc -f null NUL >nul 2>&1
 if errorlevel 1 (
   set "V_CODEC=libx264"
-  set "V_ARGS=-c:v libx264 -crf 23 -preset medium"
+  set "V_ARGS=-c:v libx264 -crf 28 -preset ultrafast -tune fastdecode"
 ) else (
-  set "V_ARGS=-c:v h264_nvenc -cq 23 -b:v 2500k -maxrate 5000k -bufsize 5000k -preset slow"
+  set "V_ARGS=-c:v h264_nvenc -cq 28 -b:v 0 -preset p1"
 )
 call :LOG INFO "Encoder=%V_CODEC%"
 
 :: ================== CONFIG ==================
 if not exist "%PROXY_DIR%" mkdir "%PROXY_DIR%" >nul 2>&1
-set "VF=crop=iw/2:ih:0:0,scale=960:960:force_original_aspect_ratio=decrease,pad=960:960:(ow-iw)/2:(oh-ih)/2,fps=30"
 set "FILELIST=%ROOT%\_to_concat.txt"
 set "OUT_FINAL=%PROJECT_DIR%\%PROJECT% TECHE RAW Proxy Complete.mp4"
+set "OUT_PARTIAL=%OUT_FINAL%.partial.mp4"
 set "QTYFILE=%PROJECT_DIR%\_concat_qty_teche.txt"
-set "ASS=%ROOT%\overlay.ass"
-set "PS_ASS=%ROOT%\_mk_overlay_ass.ps1"
-set "SRT=%ROOT%\overlay.srt"
-set "PS_SRT=%ROOT%\_mk_overlay_srt.ps1"
-del /q "%FILELIST%" "%ASS%" "%PS_ASS%" "%SRT%" "%PS_SRT%" 2>nul
+del /q "%FILELIST%" 2>nul
 
 call :LOG INFO "OUT_FINAL=%OUT_FINAL%"
 
-echo ==== TECHE (overlay + render por cantidad, con LOG) ====
+echo ==== TECHE (preview rapido + ajuste de duracion, con LOG) ====
 echo OUT FINAL: %OUT_FINAL%
 echo LOG      : %LOG%
 echo.
@@ -114,10 +110,8 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
       call :LOG WARN "No existe CAM-08-TECHE-CORREGIR-TIEMPO.ps1; usando modo compatible sin correccion"
       if not exist "!PROXY!" (
         call :LOG INFO "[ENCODE] !BASE! hacia !PROXY!"
-        "%FFMPEG%" -y -hide_banner -loglevel warning -stats -analyzeduration 100M -probesize 100M ^
-          -i "!INFILE!" -vf "%VF%" ^
-          %V_ARGS% -pix_fmt yuv420p ^
-          -c:a aac -b:a 32k -ar 16000 -ac 1 "!PROXY!"
+        "%FFMPEG%" -y -hide_banner -loglevel warning -stats -i "!INFILE!" ^
+          -map 0:v:0 -map 0:a? -c copy -movflags +faststart "!PROXY!"
         if errorlevel 1 (call :LOG ERROR "ffmpeg fallo creando proxy: !PROXY!" & goto END)
         set "PROXY_UPDATED=1"
       ) else (
@@ -136,7 +130,7 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
 
 if exist "%PS_SYNC%" (
   powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$rows = Get-ChildItem -LiteralPath '%PROXY_DIR%' -Filter '*.timesync.json' -File -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json; [pscustomobject]@{ ClipID = $j.ClipId; MainArchivo = $j.MainFileName; ProxyArchivo = $j.ProxyFileName; Corregido = $j.Corrected; DesfaseSegundos = [math]::Round($j.DifferenceSeconds,3); DuracionPreview = [math]::Round($j.PreviewDuration,3); DuracionMain = [math]::Round($j.TargetDuration,3); Main = $(if($j.MainPath){$j.MainPath}else{$j.Reference8K}); Proxy = $(if($j.ProxyPath){$j.ProxyPath}else{$_.FullName -replace '\\.timesync\\.json$',''}); Preview = $j.Preview } }; if ($rows) { $rows | Sort-Object ClipID | Export-Csv -LiteralPath '%SYNC_REPORT%' -NoTypeInformation -Encoding UTF8; $rows | Sort-Object ClipID | Select-Object ClipID,MainArchivo,ProxyArchivo,Main,Proxy | Export-Csv -LiteralPath '%PROXY_MAP%' -NoTypeInformation -Encoding UTF8 }"
+    "$rows = Get-ChildItem -LiteralPath '%PROXY_DIR%' -Filter '*.timesync.json' -File -ErrorAction SilentlyContinue | ForEach-Object { $j = Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json; [pscustomobject]@{ ClipID = $j.ClipId; MainArchivo = $j.MainFileName; ProxyArchivo = $j.ProxyFileName; Modo = $j.CorrectionMode; NegroFinalSegundos = [math]::Round([double]$j.PaddingEndSeconds,3); Corregido = $j.Corrected; DesfaseSegundos = [math]::Round($j.DifferenceSeconds,3); DuracionPreview = [math]::Round($j.PreviewDuration,3); DuracionMain = [math]::Round($j.TargetDuration,3); Main = $(if($j.MainPath){$j.MainPath}else{$j.Reference8K}); Proxy = $(if($j.ProxyPath){$j.ProxyPath}else{$_.FullName -replace '\\.timesync\\.json$',''}); Preview = $j.Preview } }; if ($rows) { $rows | Sort-Object ClipID | Export-Csv -LiteralPath '%SYNC_REPORT%' -NoTypeInformation -Encoding UTF8; $rows | Sort-Object ClipID | Select-Object ClipID,MainArchivo,ProxyArchivo,Main,Proxy | Export-Csv -LiteralPath '%PROXY_MAP%' -NoTypeInformation -Encoding UTF8 }"
   if exist "%SYNC_REPORT%" call :LOG INFO "Reporte temporal: %SYNC_REPORT%"
   if exist "%PROXY_MAP%" call :LOG INFO "Mapa Main-Proxy: %PROXY_MAP%"
 )
@@ -186,39 +180,24 @@ if not exist "%OUT_FINAL%" (
 
 if "%DO_RENDER%"=="0" goto END
 
-:: ================== OVERLAY (ASS con fallback SRT) ==================
-set "SUFFIX_NOEXT=%PROXY_SUFFIX:.mp4=%"
-call :write_ps_ass "%PS_ASS%"
-if errorlevel 1 (call :LOG ERROR "No se pudo escribir %PS_ASS%" & goto TRY_SRT)
-
-call :LOG INFO "Generando overlay.assâ€¦"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_ASS%" -ListPath "%FILELIST%" -AssPath "%ASS%" -FFProbe "%FFPROBE%" -Suffix "%SUFFIX_NOEXT%"
-if errorlevel 1 (call :LOG ERROR "Powershell/ffprobe fallo creando ASS" & goto TRY_SRT)
-if not exist "%ASS%" (call :LOG ERROR "overlay.ass no existe" & goto TRY_SRT)
-set "SUBFILTER=subtitles='%ASS:\=\\%'"
-set "SUBFILTER=%SUBFILTER::=\:%"
-goto RENDER
-
-:TRY_SRT
-call :write_ps_srt "%PS_SRT%"
-call :LOG INFO "Generando overlay.srt (fallback)â€¦"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SRT%" -ListPath "%FILELIST%" -SrtPath "%SRT%" -FFProbe "%FFPROBE%" -Suffix "%SUFFIX_NOEXT%"
-if errorlevel 1 (call :LOG ERROR "Powershell/ffprobe fallo creando SRT" & goto END)
-if not exist "%SRT%" (call :LOG ERROR "overlay.srt no existe" & goto END)
-set "SUBFILTER=subtitles='%SRT:\=\\%':force_style=Alignment=8,MarginV=4,Fontsize=14,Outline=1,PrimaryColour=&H33FFFFFF,OutlineColour=&H66000000"
-set "SUBFILTER=%SUBFILTER::=\:%"
-
-:RENDER
-call :LOG INFO "FFMPEG concat + overlayâ€¦"
-call :LOG INFO "CMD: %FFMPEG% -y -f concat -safe 0 -i ""%FILELIST%"" -vf ""%SUBFILTER%"" %V_ARGS% ... ""%OUT_FINAL%"""
+:: ================== CONCAT RAPIDO SIN RECODIFICAR ==================
+:: Cada proxy individual ya tiene la duracion del TecheMain. Unir por copia
+:: evita volver a renderizar horas de video solamente para colocar un rotulo.
+del /q "%OUT_PARTIAL%" 2>nul
+call :LOG INFO "FFMPEG concat rapido por stream copy..."
 "%FFMPEG%" -y -hide_banner -loglevel warning -stats -f concat -safe 0 -i "%FILELIST%" ^
-  -vf "%SUBFILTER%" ^
-  %V_ARGS% -pix_fmt yuv420p ^
-  -c:a aac -b:a 96k -ar 48000 -ac 2 "%OUT_FINAL%"
-if errorlevel 1 (call :LOG ERROR "FFMPEG fallo en render final" & goto END)
-
+  -map 0:v:0 -map 0:a? -c copy -movflags +faststart "%OUT_PARTIAL%"
+if errorlevel 1 (
+  call :LOG WARN "Concat directo fallo; usando codificacion rapida de compatibilidad."
+  del /q "%OUT_PARTIAL%" 2>nul
+  "%FFMPEG%" -y -hide_banner -loglevel warning -stats -f concat -safe 0 -i "%FILELIST%" ^
+    %V_ARGS% -pix_fmt yuv420p -c:a aac -b:a 96k "%OUT_PARTIAL%"
+)
+if not exist "%OUT_PARTIAL%" (call :LOG ERROR "No se pudo crear el final TECHE" & goto END)
+move /y "%OUT_PARTIAL%" "%OUT_FINAL%" >nul
+if errorlevel 1 (call :LOG ERROR "No se pudo instalar el final TECHE" & goto END)
 > "%QTYFILE%" echo %PROXY_COUNT%
-call :LOG INFO "DONE: %OUT_FINAL%"
+call :LOG INFO "DONE RAPIDO: %OUT_FINAL%"
 goto END
 
 :: ================== SUBRUTINAS ==================
@@ -231,69 +210,6 @@ for %%E in (mp4 mov mkv m4v avi) do (
   )
 )
 goto :EOF
-
-:write_ps_ass
-REM ASS: top-center ~80%% opacidad; texto "N - Nombre"
-> "%~1" echo param([string]$ListPath,[string]$AssPath,[string]$FFProbe,[string]$Suffix)
->>"%~1" echo $ErrorActionPreference='Stop'
->>"%~1" echo $acc=0.0; $idx=1
->>"%~1" echo $lines = @()
->>"%~1" echo $lines += "[Script Info]"
->>"%~1" echo $lines += "ScriptType: v4.00+"
->>"%~1" echo $lines += "PlayResX: 960"
->>"%~1" echo $lines += "PlayResY: 960"
->>"%~1" echo $lines += ""
->>"%~1" echo $lines += "[V4+ Styles]"
->>"%~1" echo $lines += "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding"
->>"%~1" echo $lines += "Style: Top,Arial,14,&H33FFFFFF,&H00FFFFFF,&H66000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,8,10,10,4,1"
->>"%~1" echo $lines += ""
->>"%~1" echo $lines += "[Events]"
->>"%~1" echo $lines += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
->>"%~1" echo Get-Content -LiteralPath $ListPath ^| ForEach-Object {
->>"%~1" echo ^ if ($_ -match "^file '(.+)'$") {
->>"%~1" echo ^   $p = $Matches[1].Replace('/','\')
->>"%~1" echo ^   $label = [IO.Path]::GetFileNameWithoutExtension($p)
->>"%~1" echo ^   if ($Suffix) { $label = [regex]::Replace($label,[regex]::Escape($Suffix)+'$','') }
->>"%~1" echo ^   $dur = ^& $FFProbe -v error -show_entries format^=duration -of default^=noprint_wrappers^=1:nokey^=1 "$p"
->>"%~1" echo ^   if (-not $dur) { throw "ffprobe sin duracion para $p" }
->>"%~1" echo ^   $dur = [double]::Parse($dur,[Globalization.CultureInfo]::InvariantCulture)
->>"%~1" echo ^   $st  = [TimeSpan]::FromSeconds($acc)
->>"%~1" echo ^   $et  = [TimeSpan]::FromSeconds($acc + [Math]::Max($dur - 0.04, 0.01))
->>"%~1" echo ^   $stf = $st.ToString('hh\:mm\:ss\.ff')
->>"%~1" echo ^   $etf = $et.ToString('hh\:mm\:ss\.ff')
->>"%~1" echo ^   $safe = $label -replace "\\{","(" -replace "\\}"," )"
->>"%~1" echo ^   $safe = "$idx - $safe"
->>"%~1" echo ^   $lines += "Dialogue: 0,$stf,$etf,Top,,0000,0000,0000,,$safe"
->>"%~1" echo ^   $acc += $dur; $idx++
->>"%~1" echo ^ }
->>"%~1" echo }
->>"%~1" echo Set-Content -LiteralPath $AssPath -Value $lines -Encoding UTF8
-exit /b
-
-:write_ps_srt
-REM SRT fallback (top-center por force_style en ffmpeg)
-> "%~1" echo param([string]$ListPath,[string]$SrtPath,[string]$FFProbe,[string]$Suffix)
->>"%~1" echo $ErrorActionPreference='Stop'
->>"%~1" echo $acc=0.0; $idx=1
->>"%~1" echo Remove-Item -LiteralPath $SrtPath -Force -ErrorAction SilentlyContinue
->>"%~1" echo Get-Content -LiteralPath $ListPath ^| ForEach-Object {
->>"%~1" echo ^ if ($_ -match "^file '(.+)'$") {
->>"%~1" echo ^   $p = $Matches[1].Replace('/','\')
->>"%~1" echo ^   $label = [IO.Path]::GetFileNameWithoutExtension($p)
->>"%~1" echo ^   if ($Suffix) { $label = [regex]::Replace($label,[regex]::Escape($Suffix)+'$','') }
->>"%~1" echo ^   $dur = ^& $FFProbe -v error -show_entries format^=duration -of default^=noprint_wrappers^=1:nokey^=1 "$p"
->>"%~1" echo ^   $dur = [double]::Parse($dur,[Globalization.CultureInfo]::InvariantCulture)
->>"%~1" echo ^   $st  = [TimeSpan]::FromSeconds($acc)
->>"%~1" echo ^   $et  = [TimeSpan]::FromSeconds($acc + [Math]::Max($dur - 0.04, 0.01))
->>"%~1" echo ^   $stf = $st.ToString('hh\:mm\:ss\,fff'); $etf = $et.ToString('hh\:mm\:ss\,fff')
->>"%~1" echo ^   Add-Content -LiteralPath $SrtPath -Value $idx
->>"%~1" echo ^   Add-Content -LiteralPath $SrtPath -Value "$stf --> $etf"
->>"%~1" echo ^   Add-Content -LiteralPath $SrtPath -Value $label
->>"%~1" echo ^   Add-Content -LiteralPath $SrtPath -Value ""
->>"%~1" echo ^   $acc += $dur; $idx++
->>"%~1" echo ^ }
->>"%~1" echo }
-exit /b
 
 :LOG
 set "LVL=%~1"
