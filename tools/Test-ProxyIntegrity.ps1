@@ -37,7 +37,8 @@ $runStamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 function Get-MediaFiles([string]$Path, [bool]$Recurse = $true) {
     if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return @() }
     return @(Get-ChildItem -LiteralPath $Path -File -Recurse:$Recurse -ErrorAction SilentlyContinue | Where-Object {
-        $VideoExtensions -contains $_.Extension.ToLowerInvariant()
+        $VideoExtensions -contains $_.Extension.ToLowerInvariant() -and
+        $_.FullName -notmatch '(?i)\\_HISTORICO(?:\\|$)'
     })
 }
 
@@ -232,10 +233,30 @@ function Test-NameContainsAlias([string]$Name,[string[]]$Aliases){
     return $false
 }
 
-function Move-ToQuarantine([string]$Path,[object]$Profile){
+function Move-ToProxyHistory([string]$Path,[object]$Profile){
     if(-not(Test-Path -LiteralPath $Path -PathType Leaf)){return $null}
-    $relative=Get-RelativePath $Profile.ProjectPath $Path
-    $destination=Join-Path $Profile.ProjectPath ("archive\proxy-integrity\{0}\{1}\{2}" -f $runStamp,$Profile.Id,$relative)
+    $pathFull=[IO.Path]::GetFullPath($Path)
+    foreach($source in @($Profile.Sources)){
+        $sourceFull=[IO.Path]::GetFullPath((Join-Path $Profile.ProjectPath ([string]$source.Path)))
+        if($pathFull.Equals($sourceFull,[StringComparison]::OrdinalIgnoreCase)){
+            throw "Proteccion de originales: se rechazo mover $pathFull"
+        }
+    }
+    $matchingRoot=@($Profile.ProxyRoots|Where-Object{
+        $rootFull=[IO.Path]::GetFullPath([string]$_).TrimEnd('\')+'\'
+        $pathFull.StartsWith($rootFull,[StringComparison]::OrdinalIgnoreCase)
+    }|Sort-Object Length -Descending|Select-Object -First 1)
+    if($matchingRoot.Count){
+        $proxyRoot=[string]$matchingRoot[0]
+        $relative=Get-RelativePath $proxyRoot $pathFull
+        $historyRoot=Join-Path $proxyRoot ("_HISTORICO\{0}"-f $runStamp)
+    }else{
+        $proxyRoot=@($Profile.ProxyRoots|Where-Object{$_}|Select-Object -First 1)
+        if($proxyRoot.Count){$historyRoot=Join-Path ([string]$proxyRoot[0]) ("_HISTORICO\{0}\FINAL"-f $runStamp)}
+        else{$historyRoot=Join-Path $Profile.ProjectPath ("_HISTORICO_PROXYS\{0}\{1}"-f $Profile.Id,$runStamp)}
+        $relative=[IO.Path]::GetFileName($pathFull)
+    }
+    $destination=Join-Path $historyRoot $relative
     New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force|Out-Null
     if(Test-Path -LiteralPath $destination){$destination+="."+[guid]::NewGuid().ToString('N')}
     Move-Item -LiteralPath $Path -Destination $destination
@@ -313,7 +334,7 @@ foreach($project in $projects){
                     foreach($file in $derived){if(Test-NameContainsAlias $file.BaseName $aliases){[void]$toMove.Add($file.FullName)}}
                     if($sourceChanged -and $aliases.Count -and @($toMove|Where-Object{$_ -notin @($profile.FinalGroups.Path)}).Count -eq 0){foreach($file in $derived){[void]$toMove.Add($file.FullName)}}
                 }
-                foreach($path in $toMove){$destination=Move-ToQuarantine $path $profile;if($destination){$moved.Add($destination)}}
+                foreach($path in $toMove){$destination=Move-ToProxyHistory $path $profile;if($destination){$moved.Add($destination)}}
             }
 
             if(-not $NoState){
@@ -331,11 +352,11 @@ foreach($project in $projects){
                 Project=$project.Name;Camera=$profile.Name;CameraId=$profile.Id;Status=$status;Sources=$profile.Sources.Count
                 Issues=@($issues);ChangedSources=@($changedSources.Path);BadSources=@($badSources.Path)
                 BadProxies=@($badDerived|ForEach-Object{$_.File.FullName});BadFinals=@($badFinals.Path)
-                Partials=@($partials.FullName);MissingFinals=@($missingFinals);Quarantined=@($moved);State=$statePath
+                Partials=@($partials.FullName);MissingFinals=@($missingFinals);Historico=@($moved);Quarantined=@($moved);State=$statePath
             })
         }catch{
             Write-Host ("[ERROR] {0} / {1}: {2}"-f $project.Name,$profile.Name,$_.Exception.Message) -ForegroundColor Red
-            $results.Add([pscustomobject]@{Project=$project.Name;Camera=$profile.Name;CameraId=$profile.Id;Status='ERROR';Sources=$profile.Sources.Count;Issues=@($_.Exception.Message);Quarantined=@();State=''})
+            $results.Add([pscustomobject]@{Project=$project.Name;Camera=$profile.Name;CameraId=$profile.Id;Status='ERROR';Sources=$profile.Sources.Count;Issues=@($_.Exception.Message);Historico=@();Quarantined=@();State=''})
         }
     }
 }

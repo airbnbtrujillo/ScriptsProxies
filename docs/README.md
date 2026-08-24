@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.24.3`.
+Version instalada: `2026.08.24.4`.
 
 ## Inicio rapido
 
@@ -32,12 +32,15 @@ El modo de una sola camara copia unicamente el script seleccionado a la carpeta 
 
 Antes de `Procesar todo`, el sistema compara el inventario actual de originales con el inventario de la ejecucion anterior. Tambien abre con `ffprobe` los originales, proxies y finales para detectar videos ilegibles o truncados, archivos `.partial.mp4`, cantidades diferentes y duraciones finales incompatibles con sus partes.
 
+Los originales son siempre de solo lectura: el sistema nunca los borra, mueve, renombra ni modifica.
+
 - Si cambio un original, se prepara solamente su camara.
 - Si se retiraron todos los originales de una camara registrada, sus resultados anteriores se apartan y la camara queda bloqueada hasta que vuelvan los originales correctos.
 - Si fallo un proxy individual, se apartan ese proxy y el final para reconstruirlos.
 - Si solo fallo el final, se conservan los proxies intermedios y se reconstruye el final.
 - Si un original esta ilegible, la reparacion de esa camara se bloquea y conserva sus resultados hasta que el original sea revisado.
-- Los archivos apartados no se borran: quedan en `archive\proxy-integrity` dentro del proyecto.
+- Los proxies apartados no se borran: quedan en `_HISTORICO\fecha_hora` dentro de su misma carpeta de proxies.
+- El final anterior queda en la subcarpeta `FINAL` de ese mismo historico.
 - El inventario compartido queda en `.proxy-integrity` dentro del proyecto, por lo que funciona aunque otra computadora vea el disco con una letra diferente.
 
 La opcion 4 del menu ejecuta una revision informativa sin renderizar ni apartar archivos. La opcion 1 realiza esta revision automaticamente y prepara las reparaciones antes del flujo normal.

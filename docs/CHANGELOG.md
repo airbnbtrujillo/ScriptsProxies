@@ -1,5 +1,12 @@
 # Cambios
 
+## 2026.08.24.4
+
+- Se declara y aplica una proteccion estricta: ningun original puede ser movido por el reparador de integridad.
+- Los proxies reemplazados se guardan en `_HISTORICO` dentro de su misma carpeta de proxies.
+- Los finales anteriores se conservan en `FINAL` dentro del historico correspondiente.
+- El verificador ignora los historicos para que no se confundan con proxies vigentes.
+
 ## 2026.08.24.3
 
 - TECHE usa directamente el preview 1920x960 completo y deja de recortar media imagen.
