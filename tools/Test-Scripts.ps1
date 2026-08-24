@@ -63,6 +63,19 @@ $ffmpeg = Find-Executable ffmpeg @('C:\ffmpeg\ffmpeg-8.0-full_build\bin\ffmpeg.e
 $ffprobe = Find-Executable ffprobe @('C:\ffmpeg\ffmpeg-8.0-full_build\bin\ffprobe.exe', 'C:\ffmpeg\ffprobe.exe')
 if ($ffmpeg) { Add-Result OK Tool 'ffmpeg disponible.' $ffmpeg } else { Add-Result ERROR Tool 'No se encontro ffmpeg.' }
 if ($ffprobe) { Add-Result OK Tool 'ffprobe disponible.' $ffprobe } else { Add-Result ERROR Tool 'No se encontro ffprobe.' }
+if ($ffmpeg) {
+    $nvencWorks = $false
+    try {
+        & $ffmpeg -hide_banner -v error -f lavfi -i 'color=size=256x256:rate=1:duration=0.1' `
+            -frames:v 1 -c:v h264_nvenc -f null NUL 2>$null
+        $nvencWorks = ($LASTEXITCODE -eq 0)
+    } catch { $nvencWorks = $false }
+    if ($nvencWorks) {
+        Add-Result OK Tool 'NVIDIA NVENC funciona con una codificacion real.' $ffmpeg
+    } else {
+        Add-Result WARN Tool 'NVIDIA NVENC no esta operativo; TECHE cambiara automaticamente a CPU.' $ffmpeg
+    }
+}
 foreach ($tool in @('powershell.exe', 'cmd.exe')) {
     $found = Find-Executable $tool
     if ($found) { Add-Result OK Tool "$tool disponible." $found } else { Add-Result ERROR Tool "No se encontro $tool." }

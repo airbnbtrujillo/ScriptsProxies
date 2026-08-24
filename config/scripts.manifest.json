@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.08.23.3",
+  "version": "2026.08.24.1",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },

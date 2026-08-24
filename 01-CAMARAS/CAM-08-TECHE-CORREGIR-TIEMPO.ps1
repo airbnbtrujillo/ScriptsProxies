@@ -46,6 +46,20 @@ function Test-HasAudio([string] $Path) {
     return ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace(($value -join '')))
 }
 
+function Test-VideoEncoder([string] $Encoder) {
+    try {
+        & $FFmpeg -hide_banner -v error -f lavfi -i 'color=size=256x256:rate=1:duration=0.1' `
+            -frames:v 1 -c:v $Encoder -f null NUL 2>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
+$ErrorLog = "$Output.timesync-error.log"
+try {
+Remove-Item -LiteralPath $ErrorLog -Force -ErrorAction SilentlyContinue
+
 if (-not (Test-Path -LiteralPath $Folder -PathType Container)) { throw "Carpeta inexistente: $Folder" }
 if (-not (Test-Path -LiteralPath $Preview -PathType Leaf)) { throw "Preview inexistente: $Preview" }
 
@@ -134,9 +148,8 @@ $ratio = if ($previewInfo.Duration -gt 0) { $targetDuration / $previewInfo.Durat
 $videoFilter = if ($needsCorrection) { "$baseVideo,setpts=PTS*$($ratio.ToString('0.############',$Invariant))" } else { $baseVideo }
 $hasAudio = Test-HasAudio $previewFull
 
-$codec = 'h264_nvenc'
-& $FFmpeg -hide_banner -v error -h "encoder=$codec" *> $null
-if ($LASTEXITCODE -ne 0) { $codec = 'libx264' }
+$codec = if (Test-VideoEncoder 'h264_nvenc') { 'h264_nvenc' } else { 'libx264' }
+Write-Host ("[CODEC] {0}" -f $codec)
 $videoArgs = if ($codec -eq 'h264_nvenc') {
     @('-c:v',$codec,'-cq','23','-b:v','2500k','-maxrate','5000k','-bufsize','5000k','-preset','slow')
 } else {
@@ -177,3 +190,23 @@ $state.OutputDuration = $outputInfo.Duration
 $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Sidecar -Encoding UTF8
 Write-Host ('[OK] {0}' -f $Output)
 exit 10
+} catch {
+    try {
+        $errorDir = Split-Path -Parent $ErrorLog
+        if ($errorDir -and -not (Test-Path -LiteralPath $errorDir)) {
+            New-Item -ItemType Directory -Path $errorDir -Force | Out-Null
+        }
+        $detail = @(
+            "Fecha: $((Get-Date).ToString('o'))"
+            "Clip: $(Split-Path $Folder -Leaf)"
+            "Preview: $Preview"
+            "Output: $Output"
+            "Error: $($_.Exception.Message)"
+            "Posicion: $($_.InvocationInfo.PositionMessage)"
+            "Detalle: $($_ | Out-String)"
+        ) -join [Environment]::NewLine
+        Set-Content -LiteralPath $ErrorLog -Value $detail -Encoding UTF8
+    } catch {}
+    Write-Error ("TECHE fallo: {0}. Detalle: {1}" -f $_.Exception.Message, $ErrorLog)
+    exit 1
+}

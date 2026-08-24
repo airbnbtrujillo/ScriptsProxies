@@ -12,6 +12,7 @@ pushd "%~dp0" || (
   exit /b 1
 )
 set "_DID_PUSHD=1"
+set "RUN_FAILED=0"
 set "ROOT=%CD%"
 for %%I in ("%ROOT%\..") do set "PROJECT_DIR=%%~fI"
 for %%I in ("%PROJECT_DIR%") do set "PROJECT=%%~nxI"
@@ -52,7 +53,13 @@ set "FFPROBE=ffprobe"
 %FFPROBE% -version >nul 2>&1 || (call :LOG ERROR "ffprobe no encontrado" & goto END)
 
 set "V_CODEC=h264_nvenc"
-%FFMPEG% -hide_banner -v error -h encoder=%V_CODEC% >nul 2>&1 || set "V_CODEC=libx264"
+%FFMPEG% -hide_banner -v error -f lavfi -i "color=size=256x256:rate=1:duration=0.1" -frames:v 1 -c:v h264_nvenc -f null NUL >nul 2>&1
+if errorlevel 1 (
+  set "V_CODEC=libx264"
+  set "V_ARGS=-c:v libx264 -crf 23 -preset medium"
+) else (
+  set "V_ARGS=-c:v h264_nvenc -cq 23 -b:v 2500k -maxrate 5000k -bufsize 5000k -preset slow"
+)
 call :LOG INFO "Encoder=%V_CODEC%"
 
 :: ================== CONFIG ==================
@@ -101,7 +108,7 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
       if "!SYNC_RC!"=="10" set "PROXY_UPDATED=1"
       if not "!SYNC_RC!"=="0" if not "!SYNC_RC!"=="10" (
         call :LOG ERROR "Correccion temporal fallo para !BASE! (codigo !SYNC_RC!)"
-        goto END
+        call :LOG ERROR "Detalle persistente: !PROXY!.timesync-error.log"
       )
     ) else (
       call :LOG WARN "No existe CAM-08-TECHE-CORREGIR-TIEMPO.ps1; usando modo compatible sin correccion"
@@ -109,7 +116,7 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
         call :LOG INFO "[ENCODE] !BASE! hacia !PROXY!"
         "%FFMPEG%" -y -hide_banner -loglevel warning -stats -analyzeduration 100M -probesize 100M ^
           -i "!INFILE!" -vf "%VF%" ^
-          -c:v %V_CODEC% -cq 23 -b:v 2500k -maxrate 5000k -bufsize 5000k -pix_fmt yuv420p -preset slow ^
+          %V_ARGS% -pix_fmt yuv420p ^
           -c:a aac -b:a 32k -ar 16000 -ac 1 "!PROXY!"
         if errorlevel 1 (call :LOG ERROR "ffmpeg fallo creando proxy: !PROXY!" & goto END)
         set "PROXY_UPDATED=1"
@@ -203,10 +210,10 @@ set "SUBFILTER=%SUBFILTER::=\:%"
 
 :RENDER
 call :LOG INFO "FFMPEG concat + overlayâ€¦"
-call :LOG INFO "CMD: %FFMPEG% -y -f concat -safe 0 -i ""%FILELIST%"" -vf ""%SUBFILTER%"" -c:v %V_CODEC% ... ""%OUT_FINAL%"""
+call :LOG INFO "CMD: %FFMPEG% -y -f concat -safe 0 -i ""%FILELIST%"" -vf ""%SUBFILTER%"" %V_ARGS% ... ""%OUT_FINAL%"""
 "%FFMPEG%" -y -hide_banner -loglevel warning -stats -f concat -safe 0 -i "%FILELIST%" ^
   -vf "%SUBFILTER%" ^
-  -c:v %V_CODEC% -cq 23 -b:v 2500k -maxrate 5000k -bufsize 5000k -pix_fmt yuv420p -preset slow ^
+  %V_ARGS% -pix_fmt yuv420p ^
   -c:a aac -b:a 96k -ar 48000 -ac 2 "%OUT_FINAL%"
 if errorlevel 1 (call :LOG ERROR "FFMPEG fallo en render final" & goto END)
 
@@ -290,6 +297,7 @@ exit /b
 
 :LOG
 set "LVL=%~1"
+if /I "%LVL%"=="ERROR" set "RUN_FAILED=1"
 shift
 set "MSG=%*"
 echo [!TIME:~0,8!] [%LVL%] %MSG%
@@ -299,7 +307,6 @@ exit /b
 :END
 call :LOG INFO "==== RUN END ===="
 if defined _DID_PUSHD popd
-endlocal
-exit /b
+endlocal & exit /b %RUN_FAILED%
 
 

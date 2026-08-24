@@ -1,5 +1,14 @@
 # Cambios
 
+## 2026.08.24.1
+
+- TECHE prueba el codificador NVIDIA con una codificacion real y usa CPU si la GPU no funciona.
+- Los errores del corrector temporal quedan guardados junto al proxy como `*.timesync-error.log`.
+- Un clip TECHE defectuoso ya no detiene los clips siguientes del mismo proyecto.
+- El script conserva los proxies validos, reemplaza parciales al reintentar y devuelve un codigo de error verificable.
+- El render final usa parametros compatibles tanto con NVIDIA como con CPU.
+- El diagnostico comprueba NVENC con una codificacion minima real para validar cada computadora.
+
 ## 2026.08.23.3
 
 - Se dejo un unico lanzador visible en la raiz.
