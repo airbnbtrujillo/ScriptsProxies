@@ -1,5 +1,11 @@
 # Cambios
 
+## 2026.08.24.5
+
+- Se normalizan las marcas PTS de video y audio de los previews TECHE.
+- Los previews con una duracion declarada distinta de la realmente decodificable reciben un margen negro y luego se recortan exactamente al Main.
+- Se corrige el rechazo de proxies que quedaban entre 0.08 y 0.17 segundos cortos.
+
 ## 2026.08.24.4
 
 - Se declara y aplica una proteccion estricta: ningun original puede ser movido por el reparador de integridad.

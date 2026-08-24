@@ -175,12 +175,17 @@ if ([Math]::Abs($difference) -le $ToleranceSeconds) {
     } else {
         @('-c:v',$codec,'-preset','ultrafast','-crf','28','-tune','fastdecode')
     }
-    $padArg = $paddingSeconds.ToString('0.############',$Invariant)
-    $videoFilter = 'tpad=stop_mode=add:color=black:stop_duration=' + $padArg + ',format=yuv420p'
+    # Algunos previews declaran mas duracion que la que realmente se puede
+    # decodificar. Se agrega un segundo de margen negro y luego se recorta con
+    # exactitud al Main; el contenido nunca se estira ni cambia de velocidad.
+    $renderPadding = $paddingSeconds + 1.0
+    $padArg = $renderPadding.ToString('0.############',$Invariant)
+    $videoFilter = 'setpts=PTS-STARTPTS,tpad=stop_mode=add:color=black:stop_duration=' + $padArg + `
+        ',trim=duration=' + $durationArg + ',setpts=PTS-STARTPTS,format=yuv420p'
     $args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
         '-map','0:v:0','-vf',$videoFilter) + $videoArgs + @('-pix_fmt','yuv420p')
     if ($hasAudio) {
-        $audioFilter = 'apad=pad_dur=' + $padArg + ',atrim=duration=' + $durationArg
+        $audioFilter = 'asetpts=PTS-STARTPTS,apad=pad_dur=' + $padArg + ',atrim=duration=' + $durationArg + ',asetpts=PTS-STARTPTS'
         $args += @('-map','0:a:0','-af',$audioFilter,'-c:a','aac','-b:a','96k')
     } else {
         $args += '-an'
@@ -188,6 +193,7 @@ if ([Math]::Abs($difference) -le $ToleranceSeconds) {
     $args += @('-t',$durationArg,'-movflags','+faststart',$tempOutput)
     $state.CorrectionMode = $mode
     $state.PaddingEndSeconds = $paddingSeconds
+    $state.RenderPaddingSafetySeconds = 1.0
     $state.VideoEncoder = $codec
     Write-Host ("[CODEC RAPIDO] {0}" -f $codec)
 }
