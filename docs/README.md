@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.24.5`.
+Version instalada: `2026.08.27.1`.
 
 ## Inicio rapido
 
@@ -49,10 +49,11 @@ La opcion 4 del menu ejecuta una revision informativa sin renderizar ni apartar 
 
 TECHE utiliza directamente `TechePrev.mp4`, que ya tiene la misma proporcion que `TecheMain.mp4`, sin decodificar el archivo 8K. No altera la velocidad del contenido:
 
-- Si las duraciones coinciden, copia el preview directamente.
-- Si el preview es mas largo, recorta el final por copia rapida.
+- Si las duraciones coinciden, normaliza rapidamente el preview.
+- Si el preview es mas largo, recorta y normaliza el final.
 - Si es mas corto, agrega negro al final y recorta exactamente a la duracion del Main, incluso cuando el preview tiene marcas internas defectuosas.
-- El final se une sin recodificar todos los clips nuevamente.
+- Todos los proxies quedan con timestamps, FPS y audio uniformes para una union segura.
+- El final se une sin recodificar todos los clips nuevamente y se valida contra la suma de sus partes antes de instalarse.
 
 El reporte `TECHE TimeSync Report.csv` indica para cada clip si fue copia directa, recorte o agregado de negro. El mapa `TECHE Main-Proxy Map.csv` conserva la correspondencia exacta entre el main y su proxy para Premiere.
 

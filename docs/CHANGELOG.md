@@ -1,5 +1,13 @@
 # Cambios
 
+## 2026.08.27.1
+
+- Todos los previews TECHE se normalizan a timestamps desde cero, 30000/1001 FPS, H.264 y audio AAC estereo.
+- Se elimina el recorte por stream copy que podia dejar proxies entre 0.075 y 0.15 segundos cortos.
+- Se evita que edit-lists del preview generen huecos o duraciones duplicadas en el final concatenado.
+- El final se valida contra la suma de los proxies y no se instala si la diferencia supera la tolerancia segura.
+- Un proxy cuyo corrector devuelve error ya no se incluye en la lista final aunque exista un archivo antiguo.
+
 ## 2026.08.24.5
 
 - Se normalizan las marcas PTS de video y audio de los previews TECHE.

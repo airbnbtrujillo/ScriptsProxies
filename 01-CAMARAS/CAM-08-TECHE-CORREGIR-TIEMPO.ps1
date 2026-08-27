@@ -88,7 +88,7 @@ if ($needsCorrection -and -not $withinGuard) {
 }
 
 $state = [ordered]@{
-    Version = 3
+    Version = 4
     ClipId = Split-Path $Folder -Leaf
     MainPath = if ($raw) { $raw.FullName } else { $null }
     MainFileName = if ($raw) { $raw.Name } else { $null }
@@ -120,22 +120,6 @@ if ((Test-Path -LiteralPath $Output -PathType Leaf) -and (Test-Path -LiteralPath
     } catch { $canKeep = $false }
 }
 
-# Adopta proxies nuevos que ya tienen la duracion y dimensiones del preview.
-# Asi, instalar esta mejora no obliga a renderizar nuevamente todo el archivo.
-if (-not $canKeep -and (Test-Path -LiteralPath $Output -PathType Leaf)) {
-    try {
-        $existingInfo = Get-MediaInfo $Output
-        $adoptionTolerance = [Math]::Max($ToleranceSeconds, 1.0 / 30.0 + 0.01)
-        if ($existingInfo.Width -eq $previewInfo.Width -and $existingInfo.Height -eq $previewInfo.Height -and
-            [Math]::Abs($existingInfo.Duration - $targetDuration) -le $adoptionTolerance) {
-            $state.OutputDuration = $existingInfo.Duration
-            $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Sidecar -Encoding UTF8
-            $canKeep = $true
-            Write-Host ('[ADOPTA] Proxy existente valido: {0}' -f $Output)
-        }
-    } catch { $canKeep = $false }
-}
-
 if ($canKeep) {
     Write-Host ('[KEEP] {0} | desfase={1:+0.000;-0.000;0.000}s' -f (Split-Path $Folder -Leaf), $difference)
     exit 0
@@ -148,55 +132,45 @@ Remove-Item -LiteralPath $tempOutput -Force -ErrorAction SilentlyContinue
 
 $hasAudio = Test-HasAudio $previewFull
 
-# El preview y el main TECHE empiezan con la misma marca de tiempo. La diferencia
-# observada esta al final: nunca se estira ni se acelera el contenido completo.
-# Si el preview alcanza o sobra, solo se remultiplexa/recorta con stream copy.
-# Unicamente cuando falta tiempo se codifica el preview ligero y se agrega negro
-# al final. En CPU se usa ultrafast para evitar velocidades como 0.08x.
+# Todos los previews se normalizan con codificacion rapida. La copia directa de
+# algunos MP4 TECHE conserva edit-lists y timestamps que despues crean huecos al
+# concatenar. Se procesa solo el preview ligero, nunca el Main 8K.
 $durationArg = $targetDuration.ToString('0.############',$Invariant)
 $paddingSeconds = [Math]::Max(0.0, $difference)
-if ([Math]::Abs($difference) -le $ToleranceSeconds) {
-    $mode = 'COPIA-DIRECTA'
-    Copy-Item -LiteralPath $previewFull -Destination $tempOutput -Force
-    $args = $null
-    $state.CorrectionMode = $mode
-    $state.PaddingEndSeconds = 0.0
+$mode = if ([Math]::Abs($difference) -le $ToleranceSeconds) {
+    'NORMALIZA-RAPIDO'
 } elseif ($difference -lt 0) {
-    $mode = 'RECORTA-COPIA'
-    $args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
-        '-map','0:v:0','-map','0:a?','-c','copy','-t',$durationArg,'-movflags','+faststart',$tempOutput)
-    $state.CorrectionMode = $mode
-    $state.PaddingEndSeconds = 0.0
+    'RECORTA-RAPIDO'
 } else {
-    $mode = 'NEGRO-AL-FINAL'
-    $codec = if (Test-VideoEncoder 'h264_nvenc') { 'h264_nvenc' } else { 'libx264' }
-    $videoArgs = if ($codec -eq 'h264_nvenc') {
-        @('-c:v',$codec,'-preset','p1','-cq','28','-b:v','0')
-    } else {
-        @('-c:v',$codec,'-preset','ultrafast','-crf','28','-tune','fastdecode')
-    }
-    # Algunos previews declaran mas duracion que la que realmente se puede
-    # decodificar. Se agrega un segundo de margen negro y luego se recorta con
-    # exactitud al Main; el contenido nunca se estira ni cambia de velocidad.
-    $renderPadding = $paddingSeconds + 1.0
-    $padArg = $renderPadding.ToString('0.############',$Invariant)
-    $videoFilter = 'setpts=PTS-STARTPTS,tpad=stop_mode=add:color=black:stop_duration=' + $padArg + `
-        ',trim=duration=' + $durationArg + ',setpts=PTS-STARTPTS,format=yuv420p'
-    $args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
-        '-map','0:v:0','-vf',$videoFilter) + $videoArgs + @('-pix_fmt','yuv420p')
-    if ($hasAudio) {
-        $audioFilter = 'asetpts=PTS-STARTPTS,apad=pad_dur=' + $padArg + ',atrim=duration=' + $durationArg + ',asetpts=PTS-STARTPTS'
-        $args += @('-map','0:a:0','-af',$audioFilter,'-c:a','aac','-b:a','96k')
-    } else {
-        $args += '-an'
-    }
-    $args += @('-t',$durationArg,'-movflags','+faststart',$tempOutput)
-    $state.CorrectionMode = $mode
-    $state.PaddingEndSeconds = $paddingSeconds
-    $state.RenderPaddingSafetySeconds = 1.0
-    $state.VideoEncoder = $codec
-    Write-Host ("[CODEC RAPIDO] {0}" -f $codec)
+    'NEGRO-AL-FINAL'
 }
+$codec = if (Test-VideoEncoder 'h264_nvenc') { 'h264_nvenc' } else { 'libx264' }
+$videoArgs = if ($codec -eq 'h264_nvenc') {
+    @('-c:v',$codec,'-preset','p1','-cq','28','-b:v','0')
+} else {
+    @('-c:v',$codec,'-preset','ultrafast','-crf','28','-tune','fastdecode')
+}
+
+# Un segundo de margen cubre duraciones declaradas mayores que los frames
+# decodificables. trim fija exactamente la duracion del Main sin estirar video.
+$renderPadding = $paddingSeconds + 1.0
+$padArg = $renderPadding.ToString('0.############',$Invariant)
+$videoFilter = 'setpts=PTS-STARTPTS,fps=30000/1001,tpad=stop_mode=add:color=black:stop_duration=' + $padArg + `
+    ',trim=duration=' + $durationArg + ',setpts=PTS-STARTPTS,format=yuv420p'
+$args = @('-y','-hide_banner','-loglevel','warning','-stats','-i',$previewFull,
+    '-map','0:v:0','-vf',$videoFilter) + $videoArgs + @('-pix_fmt','yuv420p')
+if ($hasAudio) {
+    $audioFilter = 'asetpts=PTS-STARTPTS,apad=pad_dur=' + $padArg + ',atrim=duration=' + $durationArg + ',asetpts=PTS-STARTPTS'
+    $args += @('-map','0:a:0','-af',$audioFilter,'-c:a','aac','-b:a','96k','-ar','48000','-ac','2')
+} else {
+    $args += '-an'
+}
+$args += @('-t',$durationArg,'-movflags','+faststart',$tempOutput)
+$state.CorrectionMode = $mode
+$state.PaddingEndSeconds = $paddingSeconds
+$state.RenderPaddingSafetySeconds = 1.0
+$state.VideoEncoder = $codec
+Write-Host ("[CODEC RAPIDO] {0}" -f $codec)
 
 Write-Host ('[{0}] {1} | preview={2:N3}s referencia={3:N3}s desfase={4:+0.000;-0.000;0.000}s' -f `
     $mode, (Split-Path $Folder -Leaf), $previewInfo.Duration, $targetDuration, $difference)

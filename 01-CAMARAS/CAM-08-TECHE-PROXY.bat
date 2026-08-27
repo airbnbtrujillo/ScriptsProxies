@@ -96,12 +96,15 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
       set "PROXY=!PROXY_LEGACY!"
       call :LOG INFO "[LEGACY] Se conserva el proxy existente: !PROXY_LEGACY!"
     )
+    set "SYNC_OK=0"
     if exist "%PS_SYNC%" (
       call :LOG INFO "[SYNC] Analizando !BASE! sin decodificar el video 8K"
       powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SYNC%" ^
         -Folder "!DIR!" -Preview "!INFILE!" -Output "!PROXY!" -FFmpeg "%FFMPEG%" -FFprobe "%FFPROBE%"
       set "SYNC_RC=!ERRORLEVEL!"
       if "!SYNC_RC!"=="10" set "PROXY_UPDATED=1"
+      if "!SYNC_RC!"=="0" set "SYNC_OK=1"
+      if "!SYNC_RC!"=="10" set "SYNC_OK=1"
       if not "!SYNC_RC!"=="0" if not "!SYNC_RC!"=="10" (
         call :LOG ERROR "Correccion temporal fallo para !BASE! (codigo !SYNC_RC!)"
         call :LOG ERROR "Detalle persistente: !PROXY!.timesync-error.log"
@@ -114,11 +117,13 @@ for /f "delims=" %%D in ('dir /b /ad "%SUBPAT%" 2^>nul ^| sort') do (
           -map 0:v:0 -map 0:a? -c copy -movflags +faststart "!PROXY!"
         if errorlevel 1 (call :LOG ERROR "ffmpeg fallo creando proxy: !PROXY!" & goto END)
         set "PROXY_UPDATED=1"
+        set "SYNC_OK=1"
       ) else (
         call :LOG INFO "[KEEP] !BASE! (proxy existe)"
+        set "SYNC_OK=1"
       )
     )
-    if exist "!PROXY!" (
+    if "!SYNC_OK!"=="1" if exist "!PROXY!" (
       set "P=!PROXY:\=/!"
       >>"%FILELIST%" echo file '!P!'
       set /a PROXY_COUNT+=1
@@ -194,6 +199,9 @@ if errorlevel 1 (
     %V_ARGS% -pix_fmt yuv420p -c:a aac -b:a 96k "%OUT_PARTIAL%"
 )
 if not exist "%OUT_PARTIAL%" (call :LOG ERROR "No se pudo crear el final TECHE" & goto END)
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference='Stop'; $inv=[Globalization.CultureInfo]::InvariantCulture; function GetDur([string]$p) { $v = & '%FFPROBE%' -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 -- $p; if (-not $v) { throw 'Sin duracion: ' + $p }; return [double]::Parse([string]($v | Select-Object -First 1),$inv) }; $sum=0.0; Get-Content -LiteralPath '%FILELIST%' | ForEach-Object { if ($_ -match \"^file '(.+)'$\") { $sum += GetDur $Matches[1].Replace('/','\') } }; $final=GetDur '%OUT_PARTIAL%'; $tol=[Math]::Max(2.0,$sum*0.001); if ([Math]::Abs($final-$sum) -gt $tol) { throw ('Final {0:N3}s no coincide con proxies {1:N3}s' -f $final,$sum) }"
+if errorlevel 1 (call :LOG ERROR "El final TECHE no coincide con la suma de proxies; no se instala." & goto END)
 move /y "%OUT_PARTIAL%" "%OUT_FINAL%" >nul
 if errorlevel 1 (call :LOG ERROR "No se pudo instalar el final TECHE" & goto END)
 > "%QTYFILE%" echo %PROXY_COUNT%
