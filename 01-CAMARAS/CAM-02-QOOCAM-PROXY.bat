@@ -12,12 +12,12 @@ pushd "%~dp0" || (
 set "_DID_PUSHD=1"
 
 REM =================================================
-REM  QOOCAM Proxy Keeper v4
+REM  QOOCAM Proxy Keeper v5
 REM  - Proxy nuevo corto:   <BASE>_proxy.mp4
 REM  - Acepta proxy legado: <BASE>_proxy_1920x960_30fps.mp4
 REM  - SIN parentesis en echo dentro de bloques (evita parse bugs)
 REM =================================================
-set "SCRIPT_VER=QOOCAM Proxy Keeper v4 [dual-name + echo safe]"
+set "SCRIPT_VER=QOOCAM Proxy Keeper v5 [skip final estable]"
 echo([INFO] %SCRIPT_VER%
 
 REM ==================== CONFIG ====================
@@ -151,6 +151,32 @@ echo(==== RESUMEN ====
 echo([INFO] Fuentes: %SRC_COUNT%
 echo([INFO] Proxies nuevos creados: %NEW_PROXY% ^| Fallas proxy: %FAIL_PROXY%
 echo([INFO] Rights nuevos creados:  %NEW_RIGHT% ^| Fallas right: %FAIL_RIGHT%
+
+REM ====== SALTO SEGURO DEL FINAL ======
+REM El orquestador ya valida integridad antes de llamar este BAT. Este control
+REM adicional protege la ejecucion directa de una camara: si todas las fuentes
+REM tienen su Right25, nada cambio durante esta pasada y el final existe, no se
+REM vuelve a concatenar ni a codificar.
+set /a RIGHT_COUNT=0
+set /a RIGHT_INVALID=0
+for /f "delims=" %%R in ('dir /b /a-d "%DIR_RIGHT%\*_right_%W_RIGHT%x%H_RIGHT%_%FPS_RIGHT%fps.mp4" 2^>nul') do (
+  set /a RIGHT_COUNT+=1
+  call :MEDIA_VALID "%DIR_RIGHT%\%%R" MEDIA_OK
+  if "!MEDIA_OK!"=="0" set /a RIGHT_INVALID+=1
+)
+if "%RIGHT_COUNT%"=="0" for /f "delims=" %%R in ('dir /b /a-d "%DIR_RIGHT%\*_right_*.mp4" 2^>nul') do (
+  set /a RIGHT_COUNT+=1
+  call :MEDIA_VALID "%DIR_RIGHT%\%%R" MEDIA_OK
+  if "!MEDIA_OK!"=="0" set /a RIGHT_INVALID+=1
+)
+set "FINAL_VALID=0"
+if exist "%OUT_PATH%" call :MEDIA_VALID "%OUT_PATH%" FINAL_VALID
+echo([INFO] Fuentes=%SRC_COUNT% Rights=%RIGHT_COUNT% RightsInvalidos=%RIGHT_INVALID% FinalValido=%FINAL_VALID%
+
+if "%FAIL_PROXY%"=="0" if "%FAIL_RIGHT%"=="0" if "%NEW_PROXY%"=="0" if "%NEW_RIGHT%"=="0" if "%RIGHT_INVALID%"=="0" if "%FINAL_VALID%"=="1" if "%SRC_COUNT%"=="%RIGHT_COUNT%" if not "%SRC_COUNT%"=="0" (
+  echo([KEEP] Final existente y partes sin cambios. No se concatena: "%OUT_PATH%"
+  goto :END
+)
 
 REM ====== Construir lista desde Right25 ======
 echo(
@@ -332,6 +358,12 @@ if exist "%DIR_PROXY%\%~1_proxy_%W_PROXY%x%H_PROXY%_%FPS_PROXY%fps.mp4" (
   set "PROXY_PICK=%DIR_PROXY%\%~1_proxy_%W_PROXY%x%H_PROXY%_%FPS_PROXY%fps.mp4"
   exit /b 0
 )
+exit /b 0
+
+
+:MEDIA_VALID
+set "%~2=0"
+for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=index -of csv^=p^=0 "%~1" 2^>nul`) do set "%~2=1"
 exit /b 0
 
 

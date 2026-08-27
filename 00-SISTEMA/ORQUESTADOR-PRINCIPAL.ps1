@@ -241,6 +241,9 @@ foreach ($proj in $projectFolders) {
     $vuzeCompleteFile   = Get-ChildItem -LiteralPath $projPath -File -Filter "*VUZE RAW PROXY Complete*"  -ErrorAction SilentlyContinue | Select-Object -First 1
     $hasVuzeComplete    = $null -ne $vuzeCompleteFile
 
+    $qooCompleteFile    = Get-ChildItem -LiteralPath $projPath -File -Filter "*QOOCAM RAW Proxy Complete*" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $hasQooComplete     = $null -ne $qooCompleteFile
+
     $techeCompleteFile  = Get-ChildItem -LiteralPath $projPath -File -Filter "*TECHE RAW PROXY Complete*" -ErrorAction SilentlyContinue | Select-Object -First 1
     $hasTecheComplete   = $null -ne $techeCompleteFile
 
@@ -312,20 +315,26 @@ foreach ($proj in $projectFolders) {
         Write-Host ' [QOO][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
     } elseif ($hasQooDir) {
         Write-Host " [QOO] Carpeta 100QOOCAM encontrada."
-        if ($QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
-            $dstQooScript = Join-Path $qooDirPath (Split-Path $QooProxyScriptSrc -Leaf)
-            Write-Host " [QOO] Copiando script QOOCAM -> $dstQooScript"
-            try {
-                Copy-Item -LiteralPath $QooProxyScriptSrc -Destination $dstQooScript -Force
-                $copiedQooProxy = $true
-                Write-Host " [QOO] Ejecutando script QOOCAM (espera inteligente) en $qooDirPath ..."
-                Invoke-Bat-Watch -BatFullPath $dstQooScript -WorkDir $qooDirPath
-                $ranQooProxy = $true
-            } catch {
-                Write-Host " [QOO][ERROR] $($_.Exception.Message)"
+        if (-not $hasQooComplete) {
+            if ($QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
+                $dstQooScript = Join-Path $qooDirPath (Split-Path $QooProxyScriptSrc -Leaf)
+                Write-Host " [QOO] Copiando script QOOCAM -> $dstQooScript"
+                try {
+                    Copy-Item -LiteralPath $QooProxyScriptSrc -Destination $dstQooScript -Force
+                    $copiedQooProxy = $true
+                    Write-Host " [QOO] Ejecutando script QOOCAM (espera inteligente) en $qooDirPath ..."
+                    Invoke-Bat-Watch -BatFullPath $dstQooScript -WorkDir $qooDirPath
+                    $ranQooProxy = $true
+                    $qooCompleteFile = Get-ChildItem -LiteralPath $projPath -File -Filter "*QOOCAM RAW Proxy Complete*" -ErrorAction SilentlyContinue | Select-Object -First 1
+                    $hasQooComplete = $null -ne $qooCompleteFile
+                } catch {
+                    Write-Host " [QOO][ERROR] $($_.Exception.Message)"
+                }
+            } else {
+                Write-Host " [QOO][ADVERTENCIA] No encontré script QOOCAM en $ScriptsRoot"
             }
         } else {
-            Write-Host " [QOO][ADVERTENCIA] No encontrÃ© script QOOCAM en $ScriptsRoot"
+            Write-Host " [QOO] Ya existe 'QOOCAM RAW Proxy Complete'. OK."
         }
     } else {
         Write-Host " [QOO] NO hay carpeta 100QOOCAM. (No se crea; se continua)"

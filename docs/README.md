@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.08.27.1`.
+Version instalada: `2026.08.27.2`.
 
 ## Inicio rapido
 

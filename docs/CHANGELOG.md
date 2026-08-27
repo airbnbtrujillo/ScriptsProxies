@@ -1,5 +1,11 @@
 # Cambios
 
+## 2026.08.27.2
+
+- El orquestador omite QOOCAM cuando el control de integridad ya confirmo un final completo.
+- La ejecucion directa de QOOCAM conserva el final cuando no se crearon partes nuevas, no hubo fallos, cada fuente tiene su `Right25` y `ffprobe` confirma video valido en las partes y el final.
+- QOOCAM solo vuelve a concatenar cuando falta el final, aparece una fuente nueva, falta una parte o la auditoria preparo una reparacion real.
+
 ## 2026.08.27.1
 
 - Todos los previews TECHE se normalizan a timestamps desde cero, 30000/1001 FPS, H.264 y audio AAC estereo.
