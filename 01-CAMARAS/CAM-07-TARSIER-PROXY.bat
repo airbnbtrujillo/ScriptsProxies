@@ -1,276 +1,218 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001>nul
-REM IMPORTANTE: usar PUSHD en vez de CD, porque CD falla con rutas de red UNC \\servidor\carpeta
-set "_DID_PUSHD="
-pushd "%~dp0" || (
-  echo([ERROR] No pude entrar a la carpeta del script: "%~dp0"
-  echo([ERROR] Si esta en red, verifica permisos o mapea la ruta como unidad.
-  endlocal
-  exit /b 1
-)
-set "_DID_PUSHD=1"
 
-REM ==================== CONFIG ====================
+REM TARSIER Proxy rapido v2
+REM Entrada: carpeta Videos o, si no existe, los videos de la carpeta actual.
+REM Right25 es el preview para Premiere: ojo derecho 960x960 a 25 fps.
+REM Usa HEVC CUDA + scale_cuda + NVENC cuando estan disponibles.
+REM Nunca modifica originales. Los temporales invalidos se archivan en _HISTORICO.
+
+set "_DID_PUSHD="
+pushd "%~dp0" || (echo([ERROR] No pude entrar a "%~dp0" & endlocal & exit /b 1)
+set "_DID_PUSHD=1"
+set "RUN_FAILED=0"
+set "ROOT=%CD%"
+for %%I in ("%ROOT%\..") do set "PROJECT_DIR=%%~fI"
+for %%I in ("%PROJECT_DIR%") do set "PROJECT=%%~nxI"
+
+REM ==================== CONFIG RAPIDA ====================
 set "DIR_IN=Videos"
 set "DIR_PROXY=Proxies"
 set "DIR_RIGHT=Right25"
-
-set "FILL_PROXIES=1"
-set "FILL_RIGHTS=1"         REM siempre desde PROXY
-set "RECURSIVE_IN=1"
-
-set "ORDER_BY=NAME"         REM NAME o TIME
-set "PAUSE_AT_END=0"
-
-REM Proxy (SBS completo reducido)
-set "W_PROXY=1920"
-set "H_PROXY=960"
-set "FPS_PROXY=30"
-set "A_BR_PROXY=96k"
-
-REM Right (mitad derecha 960x960@30)
+set "CREATE_SBS_PROXY=0"
+set "W_PROXY=1280"
+set "H_PROXY=640"
 set "W_RIGHT=960"
 set "H_RIGHT=960"
-set "FPS_RIGHT=30"
-set "A_BR_RIGHT=32k"
-set "A_AR_RIGHT=16000"
-set "A_CH_RIGHT=1"
-
+set "FPS=25"
 set "EXTS=mp4 mov mkv m4v"
-REM =================================================
+set "PAUSE_AT_END=0"
 
-REM ====== Salida raiz <DRIVE>\<TOP>\<TOP> ======
-set "CUR=%CD%"
-set "DRIVE_ROOT=%CUR:~0,3%"
-for /f "tokens=1 delims=\" %%G in ("%CUR:~3%") do set "TOP=%%G"
-if not defined TOP ( echo([ERROR] No pude resolver TOP desde "%CD%" & goto :END )
-set "OUT_DIR=%DRIVE_ROOT%%TOP%\"
-set "OUT_NAME=%TOP% TARSIER RAW Proxy Complete.mp4"
-set "OUT_PATH=%OUT_DIR%%OUT_NAME%"
-if not exist "%OUT_DIR%" md "%OUT_DIR%"
-echo([INFO] OUT_PATH: "%OUT_PATH%"
+REM CREATE_SBS_PROXY=0 evita un proxy SBS intermedio innecesario.
+REM Ponlo en 1 solo si tambien necesitas un preview SBS 1280x640.
 
-REM ====== Prechequeos ======
-where ffmpeg  >nul 2>&1 || (echo([ERROR] ffmpeg no esta en PATH & goto :END)
-where ffprobe >nul 2>&1 || (echo([ERROR] ffprobe no esta en PATH & goto :END)
-if not exist "%DIR_PROXY%" md "%DIR_PROXY%"
-if not exist "%DIR_RIGHT%" md "%DIR_RIGHT%"
+set "FFMPEG=ffmpeg"
+set "FFPROBE=ffprobe"
+%FFMPEG% -version >nul 2>&1 || if exist "C:\ffmpeg\ffmpeg-8.0-full_build\bin\ffmpeg.exe" set "FFMPEG=C:\ffmpeg\ffmpeg-8.0-full_build\bin\ffmpeg.exe"
+%FFPROBE% -version >nul 2>&1 || if exist "C:\ffmpeg\ffprobe.exe" set "FFPROBE=C:\ffmpeg\ffprobe.exe"
+%FFMPEG% -version >nul 2>&1 || (echo([ERROR] ffmpeg no esta disponible & goto END)
+%FFPROBE% -version >nul 2>&1 || (echo([ERROR] ffprobe no esta disponible & goto END)
 
-REM ====== Encoder y filtros (modo simple) ======
-echo([INFO] Encoder: h264_nvenc (decode CPU, scale CPU)
-set "VENC_PROXY=-c:v h264_nvenc -preset fast -qp 28"
-set "VENC_RIGHT=-c:v h264_nvenc -preset fast -qp 30"
+if not exist "%DIR_PROXY%" mkdir "%DIR_PROXY%" >nul 2>&1
+if not exist "%DIR_RIGHT%" mkdir "%DIR_RIGHT%" >nul 2>&1
 
-REM SIN hwaccel por el 8K HEVC del Tarsier
-set "HWDEC_PROXY="
-set "HWDEC_RIGHT="
+set "USE_GPU=0"
+%FFMPEG% -hide_banner -encoders 2>nul | findstr /i "h264_nvenc" >nul && %FFMPEG% -hide_banner -filters 2>nul | findstr /i "scale_cuda" >nul && set "USE_GPU=1"
+if "%USE_GPU%"=="1" (echo([INFO] GPU: HEVC CUDA + scale_cuda + NVENC) else (echo([WARN] GPU CUDA/NVENC no disponible. Se usa CPU.)
 
-REM Escala / crop siempre CPU (estable)
-set "FC_PROXY=[0:v]scale=%W_PROXY%:%H_PROXY%:flags=fast_bilinear,format=yuv420p[vpo]"
-set "FC_RIGHT_FROM_PROXY=[0:v]crop=iw/2:ih:iw/2:0,format=yuv420p,setsar=1,setdar=1[vro]"
+set "OUT_FINAL=%PROJECT_DIR%\%PROJECT% TARSIER RAW PROXY Complete.mp4"
+set "FILELIST=%ROOT%\_tarsier_concat.txt"
+set "ASS=%ROOT%\_tarsier_overlay.ass"
+set "PS_ASS=%ROOT%\_tarsier_make_ass.ps1"
+set "LIST=%ROOT%\_tarsier_sources.txt"
 
-REM ====== LISTAR Videos ======
-set "SCAN_SWITCH="
-if "%RECURSIVE_IN%"=="1" set "SCAN_SWITCH=/s"
-del /q kd_list.txt 2>nul
-
-if exist "%DIR_IN%\" (
-  for %%E in (%EXTS%) do dir /a-d /b %SCAN_SWITCH% "%DIR_IN%\*.%%E" >> kd_list.txt 2>nul
-  for %%A in (kd_list.txt) do if %%~zA gtr 0 (
-    echo([INFO] Videos detectado. Fuentes:
-    type kd_list.txt
-  ) else (
-    echo([WARN] Videos no tiene archivos con extensiones: %EXTS%
-  )
+REM ==================== DESCUBRIR FUENTES ====================
+set "INPUT_ROOT=%ROOT%\%DIR_IN%"
+del /q "%LIST%" 2>nul
+if exist "%INPUT_ROOT%\" (
+  for %%E in (%EXTS%) do dir /a-d /b /s "%INPUT_ROOT%\*.%%E" >> "%LIST%" 2>nul
+  set "SOURCE_MODE=Videos"
 ) else (
-  echo([WARN] "%DIR_IN%" no existe. Buscando videos en la carpeta actual.
-  for %%E in (%EXTS%) do dir /a-d /b "*.%%E" >> kd_list.txt 2>nul
-  for %%A in (kd_list.txt) do if %%~zA gtr 0 (
-    echo([INFO] Videos detectado en carpeta actual. Fuentes:
-    type kd_list.txt
-  ) else (
-    echo([ERROR] No encontre videos ni en "%DIR_IN%" ni en la carpeta actual.
-  )
+  for %%E in (%EXTS%) do dir /a-d /b "%ROOT%\*.%%E" >> "%LIST%" 2>nul
+  set "SOURCE_MODE=carpeta actual"
 )
+for %%A in ("%LIST%") do if %%~zA EQU 0 (echo([ERROR] No encontre videos en %SOURCE_MODE%. & goto END)
 
-REM ====== PROCESAR: PROXY -> RIGHT ======
+echo([INFO] Fuentes detectadas en %SOURCE_MODE%:
+type "%LIST%"
 set /a SRC_COUNT=0
 set /a NEW_PROXY=0
 set /a NEW_RIGHT=0
-if exist kd_list.txt for /f "usebackq delims=" %%F in ("kd_list.txt") do (
+if exist "%LIST%" for /f "usebackq delims=" %%F in ("%LIST%") do (
   set /a SRC_COUNT+=1
   call :PROCESS_ONE "%%~fF"
 )
-echo([INFO] Fuentes en Videos: %SRC_COUNT%  ^| Proxies creados: %NEW_PROXY%  ^| Rights creados: %NEW_RIGHT%
 
-REM ====== Construir lista desde Right25 ======
-echo(
-
-if not exist "%DIR_RIGHT%\*.mp4" (
-  echo([ERROR] Right25 no contiene MP4 validos para concatenar.
-  goto END
+REM ==================== VALIDAR PARTES Y DECIDIR FINAL ====================
+set /a RIGHT_COUNT=0
+set /a RIGHT_INVALID=0
+for /f "delims=" %%R in ('dir /b /a-d "%DIR_RIGHT%\*_right_%W_RIGHT%x%H_RIGHT%_%FPS%fps.mp4" 2^>nul') do (
+  set /a RIGHT_COUNT+=1
+  call :HAS_VIDEO "%DIR_RIGHT%\%%R" RIGHT_OK
+  if "!RIGHT_OK!"=="0" set /a RIGHT_INVALID+=1
 )
+echo([INFO] Fuentes=%SRC_COUNT% Rights=%RIGHT_COUNT% RightsInvalidos=%RIGHT_INVALID% Nuevos=%NEW_RIGHT%
+if not "%SRC_COUNT%"=="%RIGHT_COUNT%" (echo([ERROR] Cantidad de fuentes y Right25 diferente. No se crea final. & set "RUN_FAILED=1" & goto END)
+if not "%RIGHT_INVALID%"=="0" (echo([ERROR] Hay Right25 invalidos. No se crea final. & set "RUN_FAILED=1" & goto END)
 
-echo(==== Construyendo lista para concat desde "%DIR_RIGHT%" ====
-del /q list_right.txt 2>nul
-if /I "%ORDER_BY%"=="TIME" (set "DIR_SW=/o:d") else (set "DIR_SW=/o:n")
+set "FINAL_OK=0"
+if exist "%OUT_FINAL%" call :HAS_VIDEO "%OUT_FINAL%" FINAL_OK
+if "%NEW_RIGHT%"=="0" if "%FINAL_OK%"=="1" (echo([KEEP] Final Tarsier existente y partes sin cambios. No se renderiza. & goto END)
 
-for /f "delims=" %%R in ('dir /b /a-d %DIR_SW% "%DIR_RIGHT%\*_right_%W_RIGHT%x%H_RIGHT%_%FPS_RIGHT%fps.mp4" 2^>nul') do (
-  set "FN=%%~nxR"
-  setlocal enabledelayedexpansion
-  if /I not "!FN:~0,6!"=="FINAL_" echo file '%CD%\%DIR_RIGHT%\%%R'>>list_right.txt
-  endlocal
+REM ==================== CONCATENAR FINAL UNA SOLA VEZ ====================
+del /q "%FILELIST%" 2>nul
+for /f "delims=" %%R in ('dir /b /a-d /o:n "%DIR_RIGHT%\*_right_%W_RIGHT%x%H_RIGHT%_%FPS%fps.mp4" 2^>nul') do (
+  set "P=%ROOT%\%DIR_RIGHT%\%%R"
+  set "P=!P:\=/!"
+  >> "%FILELIST%" echo file '!P!'
 )
-for %%A in (list_right.txt) do if %%~zA==0 (
-  for /f "delims=" %%R in ('dir /b /a-d %DIR_SW% "%DIR_RIGHT%\*_right_*.mp4" 2^>nul') do (
-    set "FN=%%~nxR"
-    setlocal enabledelayedexpansion
-    if /I not "!FN:~0,6!"=="FINAL_" echo file '%CD%\%DIR_RIGHT%\%%R'>>list_right.txt
-    endlocal
-  )
-)
-for %%A in (list_right.txt) do if %%~zA==0 (
-  for /f "delims=" %%R in ('dir /b /a-d %DIR_SW% "%DIR_RIGHT%\*.mp4" 2^>nul') do (
-    set "FN=%%~nxR"
-    setlocal enabledelayedexpansion
-    if /I not "!FN:~0,6!"=="FINAL_" echo file '%CD%\%DIR_RIGHT%\%%R'>>list_right.txt
-    endlocal
-  )
-)
-for %%A in (list_right.txt) do if %%~zA==0 (
-  echo([ERROR] Right25 no contiene MP4 validos para concatenar.
-  goto END
-)
+for %%A in ("%FILELIST%") do if %%~zA EQU 0 (echo([ERROR] No se pudo crear la lista de Right25. & set "RUN_FAILED=1" & goto END)
 
-echo([INFO] Archivos a concatenar:
-type list_right.txt
+call :MAKE_ASS "%PS_ASS%"
+if errorlevel 1 (echo([ERROR] No se pudo preparar el overlay. & set "RUN_FAILED=1" & goto END)
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_ASS%" -ListPath "%FILELIST%" -AssPath "%ASS%" -FFProbe "%FFPROBE%"
+if errorlevel 1 (echo([ERROR] No se pudo generar el overlay. & set "RUN_FAILED=1" & goto END)
 
-REM ====== OVERLAY: N - NombreDelClip ======
-set "ASS=overlay.ass"
-set "PS_ASS=_mk_overlay_ass.ps1"
-set "SUFFIX_NOEXT="  REM mantener nombre completo
-
-call :MAKE_ASS "%PS_ASS%" || (echo([ERROR] No se pudo escribir %PS_ASS% & goto :END)
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_ASS%" -ListPath "list_right.txt" -AssPath "%ASS%" -FFProbe "ffprobe" -Suffix "%SUFFIX_NOEXT%"
-if errorlevel 1 ( echo([ERROR] Powershell/ffprobe fallo creando ASS & goto :END )
-if not exist "%ASS%" ( echo([ERROR] overlay.ass no existe & goto :END )
+set "FINAL_TMP=%OUT_FINAL%.partial.mp4"
+del /q "%FINAL_TMP%" 2>nul
 set "SUBFILTER=subtitles='%ASS:\=\\%'"
 set "SUBFILTER=!SUBFILTER::=\:!"
-echo([DBG] SUBFILTER=!SUBFILTER!
-
-REM ====== Final en raiz (concat + overlay re-encode) ======
-echo(
-echo(==== Concatenando + overlay a "%OUT_PATH%" ====
-ffmpeg -hide_banner -loglevel error -stats -y -f concat -safe 0 -i list_right.txt ^
-  -vf "!SUBFILTER!,fps=%FPS_RIGHT%,format=yuv420p" %VENC_RIGHT% -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -movflags +faststart "%OUT_PATH%"
-if exist "%OUT_PATH%" ( echo([OK] Final creado: "%OUT_PATH%" ) else ( echo([ERROR] No se pudo crear el final. Revisa permisos/list_right.txt. ) )
-
-:END
-if "%PAUSE_AT_END%"=="1" pause
-if defined _DID_PUSHD popd
-endlocal
-exit /b
+echo([INFO] Creando final TARSIER desde Right25...
+%FFMPEG% -y -hide_banner -loglevel warning -stats -f concat -safe 0 -i "%FILELIST%" ^
+  -vf "!SUBFILTER!,fps=%FPS%,format=yuv420p" -c:v h264_nvenc -preset p1 -cq 30 -c:a aac -b:a 32k -ac 1 -ar 16000 -movflags +faststart "%FINAL_TMP%"
+if errorlevel 1 (
+  echo([WARN] Final NVENC fallo; reintentando con libx264.
+  %FFMPEG% -y -hide_banner -loglevel warning -stats -f concat -safe 0 -i "%FILELIST%" ^
+    -vf "!SUBFILTER!,fps=%FPS%,format=yuv420p" -c:v libx264 -preset ultrafast -crf 30 -c:a aac -b:a 32k -ac 1 -ar 16000 -movflags +faststart "%FINAL_TMP%"
+)
+call :HAS_VIDEO "%FINAL_TMP%" FINAL_TMP_OK
+if not "%FINAL_TMP_OK%"=="1" (echo([ERROR] El final temporal es invalido; se conserva el final anterior. & set "RUN_FAILED=1" & goto END)
+move /y "%FINAL_TMP%" "%OUT_FINAL%" >nul
+echo([OK] Final creado: "%OUT_FINAL%"
+goto END
 
 :PROCESS_ONE
-REM *** Usar SIEMPRE !vars! dentro de este bloque ***
 set "IN_SRC=%~1"
-for %%# in ("!IN_SRC!") do set "BASE=%%~n#"
-set "OUT_PROXY=%DIR_PROXY%\!BASE!_proxy_%W_PROXY%x%H_PROXY%_%FPS_PROXY%fps.mp4"
-set "OUT_RIGHT=%DIR_RIGHT%\!BASE!_right_%W_RIGHT%x%H_RIGHT%_%FPS_RIGHT%fps.mp4"
-
-echo(
+for %%I in ("%~1") do set "BASE=%%~nI"
+set "OUT_PROXY=%DIR_PROXY%\!BASE!_proxy_%W_PROXY%x%H_PROXY%_%FPS%fps.mp4"
+set "OUT_RIGHT=%DIR_RIGHT%\!BASE!_right_%W_RIGHT%x%H_RIGHT%_%FPS%fps.mp4"
 echo([FILE] !BASE!
 
-REM 1) PROXY
-if "%FILL_PROXIES%"=="1" (
-  if exist "!OUT_PROXY!" (
-    echo(  - Proxy ya existe: "!OUT_PROXY!"
+if "%CREATE_SBS_PROXY%"=="1" (
+  set "PROXY_OK=0"
+  if exist "!OUT_PROXY!" call :HAS_VIDEO "!OUT_PROXY!" PROXY_OK
+  if "!PROXY_OK!"=="1" (
+    echo(  [KEEP] Proxy SBS existente
   ) else (
-    echo(  - Creando PROXY desde Videos...
-    ffmpeg -hide_banner -loglevel error -stats -y %HWDEC_PROXY% -i "!IN_SRC!" -filter_complex "%FC_PROXY%" ^
-      -map "[vpo]" -map 0:a? -r %FPS_PROXY% %VENC_PROXY% -c:a aac -b:a %A_BR_PROXY% -movflags +faststart "!OUT_PROXY!"
-    if exist "!OUT_PROXY!" (
-      for %%S in ("!OUT_PROXY!") do set "SZ=%%~zS"
-      if "!SZ!"=="0" (
-        echo(  [ERR] Proxy salio 0 bytes. Eliminando...
-        del /q "!OUT_PROXY!" 2>nul
-      ) else (
-        set /a NEW_PROXY+=1
-      )
-    ) else (
-      echo(  [ERR] No se pudo crear el proxy
-    )
+    if exist "!OUT_PROXY!" call :ARCHIVE_INVALID "!OUT_PROXY!"
+    call :MAKE_PROXY "!IN_SRC!" "!OUT_PROXY!"
+    call :HAS_VIDEO "!OUT_PROXY!" PROXY_OK
+    if "!PROXY_OK!"=="1" (set /a NEW_PROXY+=1) else (echo(  [ERROR] No se pudo crear proxy SBS & set "RUN_FAILED=1")
   )
-) else (
-  echo(  - FILL_PROXIES=0 (no se crean proxies)
 )
 
-REM 2) RIGHT (siempre desde PROXY)
-set "IN_FOR_RIGHT=!OUT_PROXY!"
-if "%FILL_RIGHTS%"=="1" (
-  if not exist "!IN_FOR_RIGHT!" (
-    echo(  [ERR] No hay proxy; no puedo crear RIGHT. Crea el proxy primero.
-  ) else (
-    if exist "!OUT_RIGHT!" (
-      echo(  - Right ya existe: "!OUT_RIGHT!"
-    ) else (
-      echo(  - Creando RIGHT desde PROXY...
-      ffmpeg -hide_banner -loglevel error -stats -y %HWDEC_RIGHT% -i "!IN_FOR_RIGHT!" -filter_complex "%FC_RIGHT_FROM_PROXY%" ^
-        -map "[vro]" -map 0:a? -r %FPS_RIGHT% %VENC_RIGHT% -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -movflags +faststart "!OUT_RIGHT!"
-      if exist "!OUT_RIGHT!" (
-        for %%S in ("!OUT_RIGHT!") do set "SZ=%%~zS"
-        if "!SZ!"=="0" (
-          echo(  [ERR] RIGHT salio 0 bytes. Eliminando...
-          del /q "!OUT_RIGHT!" 2>nul
-        ) else (
-          set /a NEW_RIGHT+=1
-        )
-      ) else (
-        echo(  [ERR] No se pudo crear el RIGHT
-      )
-    )
-  )
-) else (
-  echo(  - FILL_RIGHTS=0 (no se crean rights)
-)
+set "RIGHT_OK=0"
+if exist "!OUT_RIGHT!" call :HAS_VIDEO "!OUT_RIGHT!" RIGHT_OK
+if "!RIGHT_OK!"=="1" (echo(  [KEEP] Right25 existente & exit /b 0)
+if exist "!OUT_RIGHT!" call :ARCHIVE_INVALID "!OUT_RIGHT!"
+call :MAKE_RIGHT "!IN_SRC!" "!OUT_RIGHT!"
+call :HAS_VIDEO "!OUT_RIGHT!" RIGHT_OK
+if "!RIGHT_OK!"=="1" (set /a NEW_RIGHT+=1) else (echo(  [ERROR] No se pudo crear Right25 & set "RUN_FAILED=1")
+exit /b 0
+
+:MAKE_PROXY
+set "SRC=%~1"
+set "DST=%~2"
+set "TMP=%DST%.partial.mp4"
+del /q "%TMP%" 2>nul
+if "%USE_GPU%"=="1" %FFMPEG% -y -hide_banner -loglevel warning -stats -hwaccel cuda -hwaccel_output_format cuda -i "%SRC%" ^
+  -filter_complex "[0:v]fps=%FPS%,scale_cuda=%W_PROXY%:%H_PROXY%[v]" -map "[v]" -map 0:a? -c:v h264_nvenc -preset p1 -cq 31 -c:a aac -b:a 64k -movflags +faststart "%TMP%"
+if not exist "%TMP%" %FFMPEG% -y -hide_banner -loglevel warning -stats -i "%SRC%" ^
+  -vf "fps=%FPS%,scale=%W_PROXY%:%H_PROXY%:flags=fast_bilinear,format=yuv420p" -map 0:v:0 -map 0:a? -c:v libx264 -preset ultrafast -crf 30 -c:a aac -b:a 64k -movflags +faststart "%TMP%"
+call :HAS_VIDEO "%TMP%" TMP_OK
+if "%TMP_OK%"=="1" move /y "%TMP%" "%DST%" >nul
+exit /b 0
+
+:MAKE_RIGHT
+set "SRC=%~1"
+set "DST=%~2"
+set "TMP=%DST%.partial.mp4"
+del /q "%TMP%" 2>nul
+if "%USE_GPU%"=="1" %FFMPEG% -y -hide_banner -loglevel warning -stats -hwaccel cuda -hwaccel_output_format cuda -i "%SRC%" ^
+  -filter_complex "[0:v]fps=%FPS%,scale_cuda=1920:960,hwdownload,format=nv12,crop=%W_RIGHT%:%H_RIGHT%:%W_RIGHT%:0,format=yuv420p[v]" -map "[v]" -map 0:a? -c:v h264_nvenc -preset p1 -cq 31 -c:a aac -b:a 32k -ac 1 -ar 16000 -movflags +faststart "%TMP%"
+if not exist "%TMP%" %FFMPEG% -y -hide_banner -loglevel warning -stats -i "%SRC%" ^
+  -vf "crop=iw/2:ih:iw/2:0,fps=%FPS%,scale=%W_RIGHT%:%H_RIGHT%:flags=fast_bilinear,format=yuv420p" -map 0:v:0 -map 0:a? -c:v libx264 -preset ultrafast -crf 30 -c:a aac -b:a 32k -ac 1 -ar 16000 -movflags +faststart "%TMP%"
+call :HAS_VIDEO "%TMP%" TMP_OK
+if "%TMP_OK%"=="1" move /y "%TMP%" "%DST%" >nul
+exit /b 0
+
+:HAS_VIDEO
+set "%~2=0"
+if not exist "%~1" exit /b 0
+for /f "usebackq delims=" %%V in (`"%FFPROBE%" -v error -select_streams v:0 -show_entries stream^=index -of csv^=p^=0 "%~1" 2^>nul`) do set "%~2=1"
+exit /b 0
+
+:ARCHIVE_INVALID
+if not exist "%~1" exit /b 0
+set "HIST=%~dp1_HISTORICO"
+if not exist "%HIST%" mkdir "%HIST%" >nul 2>&1
+move /y "%~1" "%HIST%\%~nx1.invalid.%RANDOM%" >nul
 exit /b 0
 
 :MAKE_ASS
-REM Genera _mk_overlay_ass.ps1 que crea overlay.ass con l??neas "N - NombreDelClip" alineadas a cada clip
-> "%~1" echo param([string]$ListPath,[string]$AssPath,[string]$FFProbe,[string]$Suffix)
->>"%~1" echo $ErrorActionPreference='Stop'
->>"%~1" echo $acc=0.0; $idx=1
->>"%~1" echo $lines = @()
->>"%~1" echo $lines += "[Script Info]"
->>"%~1" echo $lines += "ScriptType: v4.00+"
->>"%~1" echo $lines += "PlayResX: 960"
->>"%~1" echo $lines += "PlayResY: 960"
->>"%~1" echo ""
->>"%~1" echo $lines += "[V4+ Styles]"
->>"%~1" echo $lines += "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding"
->>"%~1" echo $lines += "Style: Top,Arial,14,&H33FFFFFF,&H00FFFFFF,&H66000000,&H00000000,0,0,0,0,100,100,0,0,1,1,0,8,10,10,4,1"
->>"%~1" echo ""
->>"%~1" echo $lines += "[Events]"
->>"%~1" echo $lines += "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
->>"%~1" echo Get-Content -LiteralPath $ListPath ^| ForEach-Object {
->>"%~1" echo ^ if ($_ -match "^file '(.+)'$") {
->>"%~1" echo ^   $p = $Matches[1].Replace('/','\')
->>"%~1" echo ^   $label = [IO.Path]::GetFileNameWithoutExtension($p)
->>"%~1" echo ^   if ($Suffix) { $label = [regex]::Replace($label,[regex]::Escape($Suffix)+'$','') }
->>"%~1" echo ^   $dur = ^& $FFProbe -v error -show_entries format^=duration -of default^=noprint_wrappers^=1:nokey^=1 "$p"
->>"%~1" echo ^   if (-not $dur) { throw "ffprobe sin duracion para $p" }
->>"%~1" echo ^   $dur = [double]::Parse($dur,[Globalization.CultureInfo]::InvariantCulture)
->>"%~1" echo ^   $st  = [TimeSpan]::FromSeconds($acc)
->>"%~1" echo ^   $et  = [TimeSpan]::FromSeconds($acc + [Math]::Max($dur - 0.04, 0.01))
->>"%~1" echo ^   $stf = $st.ToString('hh\:mm\:ss\.ff')
->>"%~1" echo ^   $etf = $et.ToString('hh\:mm\:ss\.ff')
->>"%~1" echo ^   $safe = $label -replace "\\{","(" -replace "\\}"," )"
->>"%~1" echo ^   $safe = "$idx - $safe"
->>"%~1" echo ^   $lines += "Dialogue: 0,$stf,$etf,Top,,0000,0000,0000,,$safe"
->>"%~1" echo ^   $acc += $dur; $idx++
->>"%~1" echo ^ }
->>"%~1" echo }
->>"%~1" echo Set-Content -LiteralPath $AssPath -Value $lines -Encoding UTF8
-exit /b
+> "%~1" echo param([string]$ListPath,[string]$AssPath,[string]$FFProbe)
+>> "%~1" echo $ErrorActionPreference='Stop'; $acc=0.0; $idx=1; $lines=@()
+>> "%~1" echo $lines += '[Script Info]'; $lines += 'ScriptType: v4.00+'; $lines += ''
+>> "%~1" echo $lines += '[V4+ Styles]'
+>> "%~1" echo $lines += 'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding'
+>> "%~1" echo $lines += 'Style: Top,Arial,14,^&H33FFFFFF,^&H00FFFFFF,^&H66000000,^&H00000000,0,0,0,0,100,100,0,0,1,1,0,8,10,10,4,1'
+>> "%~1" echo $lines += ''; $lines += '[Events]'
+>> "%~1" echo $lines += 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text'
+>> "%~1" echo Get-Content -LiteralPath $ListPath ^| ForEach-Object {
+>> "%~1" echo ^ if ($_ -match "^file '(.+)'$") {
+>> "%~1" echo ^  $p=$Matches[1].Replace('/','\'); $dur=^& $FFProbe -v error -show_entries format^=duration -of default^=noprint_wrappers^=1:nokey^=1 $p
+>> "%~1" echo ^  if (-not $dur) { throw "ffprobe sin duracion: $p" }; $dur=[double]::Parse($dur,[Globalization.CultureInfo]::InvariantCulture)
+>> "%~1" echo ^  $st=[TimeSpan]::FromSeconds($acc).ToString('hh\:mm\:ss\.ff'); $et=[TimeSpan]::FromSeconds($acc+[Math]::Max($dur-0.04,0.01)).ToString('hh\:mm\:ss\.ff')
+>> "%~1" echo ^  $label=[IO.Path]::GetFileNameWithoutExtension($p) -replace '\{','(' -replace '\}',' )'; $lines += "Dialogue: 0,$st,$et,Top,,0000,0000,0000,,$idx - $label"; $acc += $dur; $idx++
+>> "%~1" echo ^ }
+>> "%~1" echo }
+>> "%~1" echo Set-Content -LiteralPath $AssPath -Value $lines -Encoding UTF8
+exit /b 0
 
+:END
+if exist "%FILELIST%" del /q "%FILELIST%" 2>nul
+if exist "%LIST%" del /q "%LIST%" 2>nul
+if defined _DID_PUSHD popd
+if "%PAUSE_AT_END%"=="1" pause
+endlocal & exit /b %RUN_FAILED%

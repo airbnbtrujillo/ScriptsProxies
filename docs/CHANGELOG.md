@@ -1,5 +1,13 @@
 # Cambios
 
+## 2026.09.23.1
+
+- Tarsier detecta videos tanto en `Videos` como directamente en la carpeta de camara.
+- El preview para Premiere ahora usa el ojo derecho a 960x960 y 25 fps, en vez de conservar los 50 fps del original 6K.
+- Se activa una ruta HEVC CUDA + `scale_cuda` + NVENC, con reintento CPU si la GPU falla.
+- El `Right25` se genera directamente desde el original; el proxy SBS intermedio queda desactivado por defecto y puede activarse solo si se necesita.
+- Los parciales o proxies Tarsier invalidos se archivan en `_HISTORICO`; el final se conserva si no hubo cambios.
+
 ## 2026.08.27.2
 
 - El orquestador omite QOOCAM cuando el control de integridad ya confirmo un final completo.
