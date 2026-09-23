@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001>nul
 
 REM TARSIER Proxy rapido v2
-REM Entrada: carpeta Videos o, si no existe, los videos de la carpeta actual.
+REM Entrada obligatoria: carpeta Videos.
 REM Right25 es el preview para Premiere: ojo derecho 960x960 a 25 fps.
 REM Usa HEVC CUDA + scale_cuda + NVENC cuando estan disponibles.
 REM Nunca modifica originales. Los temporales invalidos se archivan en _HISTORICO.
@@ -55,13 +55,9 @@ set "LIST=%ROOT%\_tarsier_sources.txt"
 REM ==================== DESCUBRIR FUENTES ====================
 set "INPUT_ROOT=%ROOT%\%DIR_IN%"
 del /q "%LIST%" 2>nul
-if exist "%INPUT_ROOT%\" (
-  for %%E in (%EXTS%) do dir /a-d /b /s "%INPUT_ROOT%\*.%%E" >> "%LIST%" 2>nul
-  set "SOURCE_MODE=Videos"
-) else (
-  for %%E in (%EXTS%) do dir /a-d /b "%ROOT%\*.%%E" >> "%LIST%" 2>nul
-  set "SOURCE_MODE=carpeta actual"
-)
+if not exist "%INPUT_ROOT%\" (echo([ERROR] Falta la carpeta obligatoria "%INPUT_ROOT%". No se procesan archivos de Camera01. & goto END)
+for %%E in (%EXTS%) do dir /a-d /b /s "%INPUT_ROOT%\*.%%E" >> "%LIST%" 2>nul
+set "SOURCE_MODE=Videos"
 for %%A in ("%LIST%") do if %%~zA EQU 0 (echo([ERROR] No encontre videos en %SOURCE_MODE%. & goto END)
 
 echo([INFO] Fuentes detectadas en %SOURCE_MODE%:
