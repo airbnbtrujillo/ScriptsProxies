@@ -1,5 +1,13 @@
 # Cambios
 
+## 2026.09.23.4
+
+- Tarsier busca los originales solo en el nivel directo de `Videos`; excluye automaticamente `Proxies` y `Right25`.
+
+## 2026.09.23.3
+
+- Tarsier acepta que su BAT se ejecute dentro de `Videos` o desde la carpeta que la contiene, sin perder la regla de procesar solamente `Videos`.
+
 ## 2026.09.23.2
 
 - Tarsier exige la carpeta `Videos` como unica entrada; ya no busca MP4 sueltos en `Camera01`.

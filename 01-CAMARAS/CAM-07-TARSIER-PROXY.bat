@@ -3,7 +3,7 @@ setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001>nul
 
 REM TARSIER Proxy rapido v2
-REM Entrada obligatoria: carpeta Videos.
+REM Entrada obligatoria: MP4 directamente dentro de la carpeta Videos.
 REM Right25 es el preview para Premiere: ojo derecho 960x960 a 25 fps.
 REM Usa HEVC CUDA + scale_cuda + NVENC cuando estan disponibles.
 REM Nunca modifica originales. Los temporales invalidos se archivan en _HISTORICO.
@@ -53,10 +53,15 @@ set "PS_ASS=%ROOT%\_tarsier_make_ass.ps1"
 set "LIST=%ROOT%\_tarsier_sources.txt"
 
 REM ==================== DESCUBRIR FUENTES ====================
-set "INPUT_ROOT=%ROOT%\%DIR_IN%"
+for %%I in ("%ROOT%") do set "ROOT_NAME=%%~nxI"
+if /I "%ROOT_NAME%"=="%DIR_IN%" (
+  set "INPUT_ROOT=%ROOT%"
+) else (
+  set "INPUT_ROOT=%ROOT%\%DIR_IN%"
+)
 del /q "%LIST%" 2>nul
-if not exist "%INPUT_ROOT%\" (echo([ERROR] Falta la carpeta obligatoria "%INPUT_ROOT%". No se procesan archivos de Camera01. & goto END)
-for %%E in (%EXTS%) do dir /a-d /b /s "%INPUT_ROOT%\*.%%E" >> "%LIST%" 2>nul
+if not exist "%INPUT_ROOT%\" (echo([ERROR] Falta la carpeta obligatoria "%DIR_IN%". No se procesan archivos fuera de esa carpeta. & goto END)
+for %%E in (%EXTS%) do dir /a-d /b "%INPUT_ROOT%\*.%%E" >> "%LIST%" 2>nul
 set "SOURCE_MODE=Videos"
 for %%A in ("%LIST%") do if %%~zA EQU 0 (echo([ERROR] No encontre videos en %SOURCE_MODE%. & goto END)
 
