@@ -46,6 +46,12 @@ if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Falta el scri
 $destination = Join-Path $target $camera.Script
 Copy-Item -LiteralPath $source -Destination $destination -Force
 
+if ($camera.Id -eq 2) {
+    $qooRenderer = Join-Path $cameraRoot 'CAM-02-QOOCAM-RENDER.ps1'
+    if (-not (Test-Path -LiteralPath $qooRenderer -PathType Leaf)) { throw "Falta el integrador QooCam: $qooRenderer" }
+    Copy-Item -LiteralPath $qooRenderer -Destination (Join-Path $target 'CAM-02-QOOCAM-RENDER.ps1') -Force
+}
+
 if ($camera.Companion) {
     $companionSource = Join-Path $cameraRoot $camera.Companion
     if (-not (Test-Path -LiteralPath $companionSource -PathType Leaf)) { throw "Falta el complemento: $companionSource" }
@@ -58,5 +64,19 @@ if ($PrepareOnly) {
 }
 
 Write-Host ("[CAMARA] Ejecutando solo {0} en {1}" -f $camera.Name, $target) -ForegroundColor Green
+if ($camera.Id -eq 2) {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $qooRenderer -SourceDir $target -OutputDir (Join-Path $target 'KDOutput')
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host '[CAMARA][ERROR] Falló el render QooCam; no se crearán proxies con resultados incompletos.' -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    $integrity = Join-Path $RepoRoot 'tools\Test-ProxyIntegrity.ps1'
+    $project = Split-Path -Parent $target
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $integrity -ProjectPath $project -Repair
+    if ($LASTEXITCODE -ge 2) {
+        Write-Host '[CAMARA][ERROR] La validacion posterior al render fallo; no se crearán proxies.' -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
 & $env:ComSpec /d /c ('call "{0}"' -f $destination)
 exit $LASTEXITCODE

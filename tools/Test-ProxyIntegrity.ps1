@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RootPath,
+    [string]$ProjectPath,
     [switch]$Repair,
     [switch]$NoState,
     [string]$ReportOut
@@ -18,6 +19,12 @@ if (-not $FFprobe) {
 if (-not $FFprobe) { throw 'No se encontro ffprobe; no es posible validar los videos.' }
 if ($Repair -and $NoState) { throw 'NoState es solo para auditorias de lectura; no puede combinarse con Repair.' }
 
+if (-not [string]::IsNullOrWhiteSpace($ProjectPath)) {
+    $ProjectPath = $ProjectPath.Trim().Trim('"')
+    if (-not (Test-Path -LiteralPath $ProjectPath -PathType Container)) { throw "La carpeta de proyecto no existe: $ProjectPath" }
+    $ProjectPath = (Get-Item -LiteralPath $ProjectPath).FullName
+    if ([string]::IsNullOrWhiteSpace($RootPath)) { $RootPath = Split-Path -Parent $ProjectPath }
+}
 if ([string]::IsNullOrWhiteSpace($RootPath)) {
     $RootPath = Read-Host 'Ruta raiz que contiene los proyectos'
 }
@@ -263,7 +270,11 @@ function Move-ToProxyHistory([string]$Path,[object]$Profile){
     return $destination
 }
 
-$projects=@(Get-ChildItem -LiteralPath $RootPath -Directory -ErrorAction Stop|Where-Object Name -match '^\d'|Sort-Object Name)
+$projects = if ($ProjectPath) {
+    @((Get-Item -LiteralPath $ProjectPath))
+} else {
+    @(Get-ChildItem -LiteralPath $RootPath -Directory -ErrorAction Stop|Where-Object Name -match '^\d'|Sort-Object Name)
+}
 foreach($project in $projects){
     foreach($profile in (Get-Profiles $project)){
         try{

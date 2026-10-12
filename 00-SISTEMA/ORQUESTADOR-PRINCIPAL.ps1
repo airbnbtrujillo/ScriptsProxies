@@ -147,6 +147,7 @@ function Test-CameraIntegrityBlocked {
 $ScriptsRoot             = Join-Path $RepoRoot '01-CAMARAS'
 $GifScriptsRoot          = Join-Path $RepoRoot '02-GIFS'
 $VuzeProxyScriptSrc      = Join-Path $ScriptsRoot 'CAM-01-VUZE-PROXY-960x960-20fps.bat'
+$QooRenderScriptSrc      = Join-Path $ScriptsRoot 'CAM-02-QOOCAM-RENDER.ps1'
 $QooProxyScriptSrc       = Join-Path $ScriptsRoot 'CAM-02-QOOCAM-PROXY.bat'
 $GoProProxyScriptSrc     = Join-Path $ScriptsRoot 'CAM-03-GOPRO-PROXY.bat'
 $Gear360ProxyScriptSrc   = Join-Path $ScriptsRoot 'CAM-04-GEAR360-PROXY.bat'
@@ -269,6 +270,7 @@ foreach ($proj in $projectFolders) {
     $ranTecheProxy       = $false
     $ranGifSplitter      = $false
     $copiedQooProxy      = $false
+    $ranQooRender        = $false
     $ranQooProxy         = $false
     $copiedInstaEvoProxy = $false
     $ranInstaEvoProxy    = $false
@@ -309,20 +311,45 @@ foreach ($proj in $projectFolders) {
     }
 
     # =====================================
-    # BLOQUE QOOCAM (copiar y EJECUTAR solo si existe 100QOOCAM; NO crear)
+    # BLOQUE QOOCAM: originales -> KDOutput (QooCam) -> proxies.
+    # Ambos pasos conservan manifiestos/inventarios y omiten lo ya terminado.
     # =====================================
     if ($blockedQoo) {
         Write-Host ' [QOO][BLOQUEADO] Hay un original ilegible; se conserva lo existente y no se procesa esta camara.' -ForegroundColor Red
     } elseif ($hasQooDir) {
         Write-Host " [QOO] Carpeta 100QOOCAM encontrada."
-        if (-not $hasQooComplete) {
-            if ($QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
+        $qooRenderCode = 0
+        if ($QooRenderScriptSrc -and (Test-Path -LiteralPath $QooRenderScriptSrc -PathType Leaf)) {
+            Write-Host ' [QOO] Verificando renders 180 3D Normal + Anti-Shake pendientes...'
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $QooRenderScriptSrc -SourceDir $qooDirPath -OutputDir (Join-Path $qooDirPath 'KDOutput')
+            $qooRenderCode = $LASTEXITCODE
+            $ranQooRender = $true
+        } else {
+            Write-Host " [QOO][ERROR] No encontré el integrador de render: $QooRenderScriptSrc" -ForegroundColor Red
+            $qooRenderCode = 2
+        }
+
+        if ($qooRenderCode -eq 0) {
+            if (Test-Path -LiteralPath $IntegrityScript -PathType Leaf) {
+                Write-Host ' [QOO] Validando cambios del KDOutput antes de crear proxies...'
+                & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $IntegrityScript -ProjectPath $projPath -Repair
+                $qooIntegrityCode = $LASTEXITCODE
+                if ($qooIntegrityCode -ge 2 -or (Test-CameraIntegrityBlocked $projPath 'CAM-02')) {
+                    Write-Host ' [QOO][ERROR] La integridad posterior al render no permite continuar con proxies.' -ForegroundColor Red
+                    $qooRenderCode = 2
+                }
+            }
+        }
+
+        if ($qooRenderCode -eq 0) {
+            $qooRendered = @(Get-ChildItem -LiteralPath (Join-Path $qooDirPath 'KDOutput') -File -Filter '*.mp4' -ErrorAction SilentlyContinue)
+            if ($qooRendered.Count -gt 0 -and $QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
                 $dstQooScript = Join-Path $qooDirPath (Split-Path $QooProxyScriptSrc -Leaf)
                 Write-Host " [QOO] Copiando script QOOCAM -> $dstQooScript"
                 try {
                     Copy-Item -LiteralPath $QooProxyScriptSrc -Destination $dstQooScript -Force
                     $copiedQooProxy = $true
-                    Write-Host " [QOO] Ejecutando script QOOCAM (espera inteligente) en $qooDirPath ..."
+                    Write-Host " [QOO] Verificando/creando únicamente los proxies pendientes en $qooDirPath ..."
                     Invoke-Bat-Watch -BatFullPath $dstQooScript -WorkDir $qooDirPath
                     $ranQooProxy = $true
                     $qooCompleteFile = Get-ChildItem -LiteralPath $projPath -File -Filter "*QOOCAM RAW Proxy Complete*" -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -330,11 +357,13 @@ foreach ($proj in $projectFolders) {
                 } catch {
                     Write-Host " [QOO][ERROR] $($_.Exception.Message)"
                 }
+            } elseif ($qooRendered.Count -eq 0) {
+                Write-Host ' [QOO] KDOutput todavía no contiene renders; no se ejecuta la etapa de proxies.' -ForegroundColor Yellow
             } else {
                 Write-Host " [QOO][ADVERTENCIA] No encontré script QOOCAM en $ScriptsRoot"
             }
         } else {
-            Write-Host " [QOO] Ya existe 'QOOCAM RAW Proxy Complete'. OK."
+            Write-Host ' [QOO][ERROR] Falló la etapa QooCam; se omiten los proxies de este proyecto.' -ForegroundColor Red
         }
     } else {
         Write-Host " [QOO] NO hay carpeta 100QOOCAM. (No se crea; se continua)"
@@ -693,6 +722,7 @@ foreach ($proj in $projectFolders) {
         Tiene_GIF_DJI_OSMO                 = $gifDjiOsmoDirOk
         Ejecutado_VUZE_Proxy               = $ranVuzeProxy
         Copiado_QOOCAM_Proxy               = $copiedQooProxy
+        Ejecutado_QOOCAM_Render            = $ranQooRender
         Ejecutado_QOOCAM_Proxy             = $ranQooProxy
         Copiado_GOPRO_Proxy                = $copiedGoproProxy
         Ejecutado_GOPRO_Proxy              = $ranGoproProxy

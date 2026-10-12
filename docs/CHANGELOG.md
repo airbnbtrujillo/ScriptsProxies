@@ -1,5 +1,15 @@
 # Cambios
 
+## 2026.10.11.1
+
+- Se integra el render QooCam VR180 antes del flujo de proxies, tanto en el orquestador completo como en la ejecucion de una sola camara.
+- QooCam toma todos los MP4 originales del nivel directo de `100QOOCAM` y genera `KDOutput` con 180 3D Normal, Single Import, Anti-Shake, H.265 8K y bitrate High.
+- El manifiesto de render omite salidas ya verificadas y vuelve a procesar solamente originales nuevos o modificados.
+- Los renders existentes de instalaciones anteriores se adoptan sin repetirlos solo si `ffprobe` confirma HEVC 7680x3840, duracion valida y audio estereo.
+- Se excluyen `KDOutput`, `Proxies`, `Right25` y `_HISTORICO` de la busqueda de originales.
+- La instalacion de QooCam se detecta automaticamente y tambien admite una ruta local mediante `QooCamStudioExe`.
+- Se incluye el ejecutable portable, su fuente y su receta de compilacion para corregir diferencias de interfaz desde otra computadora y compartirlas por Git.
+
 ## 2026.09.23.4
 
 - Tarsier busca los originales solo en el nivel directo de `Videos`; excluye automaticamente `Proxies` y `Right25`.

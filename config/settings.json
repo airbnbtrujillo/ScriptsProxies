@@ -3,5 +3,6 @@
   "GitRepository": "https://github.com/airbnbtrujillo/ScriptsProxies.git",
   "GitBranch": "main",
   "AutoCheckUpdates": false,
-  "UpdateChannel": "stable"
+  "UpdateChannel": "stable",
+  "QooCamStudioExe": ""
 }

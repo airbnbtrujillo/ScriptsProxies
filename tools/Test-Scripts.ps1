@@ -92,6 +92,18 @@ if (Test-Path -LiteralPath $settingsPath) {
         } else {
             Add-Result OK Cloud 'Origen de actualizacion configurado.' $settingsPath
         }
+        $qooCandidates = @()
+        if ($settings.PSObject.Properties.Name -contains 'QooCamStudioExe' -and -not [string]::IsNullOrWhiteSpace([string]$settings.QooCamStudioExe)) {
+            $qooCandidates += [string]$settings.QooCamStudioExe
+        }
+        if (${env:ProgramFiles(x86)}) { $qooCandidates += (Join-Path ${env:ProgramFiles(x86)} 'QooCamStudio\QooCamStudio.exe') }
+        if ($env:ProgramFiles) { $qooCandidates += (Join-Path $env:ProgramFiles 'QooCamStudio\QooCamStudio.exe') }
+        $qooStudio = $qooCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+        if ($qooStudio) {
+            Add-Result OK Tool 'QooCam Studio disponible para render VR180.' $qooStudio
+        } else {
+            Add-Result WARN Tool 'QooCam Studio no se detecto; solo afecta la etapa de render QOOCAM.' $settingsPath
+        }
     } catch {
         Add-Result ERROR Settings ("JSON invalido: {0}" -f $_.Exception.Message) $settingsPath
     }

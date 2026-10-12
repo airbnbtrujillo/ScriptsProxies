@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.09.23.4`.
+Version instalada: `2026.10.11.1`.
 
 ## Inicio rapido
 
@@ -27,6 +27,22 @@ Para una sola camara, selecciona la opcion 2 y pega la ruta exacta de su carpeta
 - `logs`: reportes de diagnostico.
 
 El modo de una sola camara copia unicamente el script seleccionado a la carpeta indicada y lo ejecuta ahi. No revisa ni procesa las demas camaras. Las rutas UNC y las unidades de red siguen admitidas mediante `pushd` y operaciones con rutas literales.
+
+## Flujo automatico QOOCAM
+
+Para cada proyecto con carpeta `100QOOCAM`, el procesamiento completo ahora ejecuta una sola cadena:
+
+1. Busca todos los MP4 originales que estan directamente dentro de `100QOOCAM`.
+2. Renderiza solamente los faltantes o modificados en `100QOOCAM\KDOutput` usando `180 3D Normal`, importacion Single, Anti-Shake, 7680x3840, H.265 y bitrate High.
+3. Ejecuta el flujo de proxies sobre `KDOutput`; los proxies individuales y el final estable que ya existen no se repiten.
+
+Los directorios `KDOutput`, `Proxies`, `Right25` y `_HISTORICO` nunca se vuelven a tomar como originales. El manifiesto `KDOutput\qcam_batch_manifest.json` guarda la huella de cada original y permite continuar despues de una interrupcion sin volver a renderizar lo ya verificado.
+
+Si un original previamente procesado cambia conservando el mismo nombre, el render anterior se mueve de forma recuperable a `100QOOCAM\_HISTORICO`, se genera de nuevo y la comprobacion de integridad aparta sus proxies derivados antes de reconstruirlos. Una salida que ya existe pero nunca fue registrada no se sobrescribe automaticamente.
+
+Para migrar trabajos anteriores, una salida sin manifiesto se adopta automaticamente solo cuando `ffprobe` confirma video HEVC 7680x3840, duracion valida y audio estereo. Si no supera esa verificacion, el proceso se detiene sin sobrescribirla.
+
+La configuracion de QooCam controla temporalmente el raton y requiere una sesion de Windows desbloqueada. Conviene iniciar este flujo durante las horas libres. El indicador visible avisa cuando esta configurando y cuando QooCam ya esta renderizando sin hacer clics.
 
 ## Integridad y recuperacion automatica
 
@@ -72,6 +88,8 @@ git -C C:\ScriptsProxies pull --ff-only
 ```
 
 El actualizador valida la descarga y guarda los archivos reemplazados o retirados en `archive\updates`.
+
+QooCam Studio se detecta automaticamente en sus ubicaciones habituales. Si otra computadora lo tiene instalado en una ruta diferente, define `QooCamStudioExe` en `config\settings.json`. Si la interfaz cambia por version o escala de pantalla, corrige el codigo fuente incluido en `tools\QooCamAutomation`, prueba en esa computadora y publica la correccion por Git para que ambas usen el mismo programa.
 
 ## Diagnostico sin render
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.09.23.4",
+  "version": "2026.10.11.1",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },
@@ -12,6 +12,7 @@
     { "path": "00-SISTEMA/ACTUALIZAR-SCRIPTS.cmd", "required": true, "role": "Lanzador de actualizacion" },
     { "path": "01-CAMARAS/CAM-01-VUZE-PROXY-960x960-20fps.bat", "required": true, "role": "Camara 01 VUZE" },
     { "path": "01-CAMARAS/CAM-02-QOOCAM-PROXY.bat", "required": true, "role": "Camara 02 QOOCAM" },
+    { "path": "01-CAMARAS/CAM-02-QOOCAM-RENDER.ps1", "required": true, "role": "Integrador de render QOOCAM VR180" },
     { "path": "01-CAMARAS/CAM-03-GOPRO-PROXY.bat", "required": true, "role": "Camara 03 GoPro" },
     { "path": "01-CAMARAS/CAM-04-GEAR360-PROXY.bat", "required": true, "role": "Camara 04 Gear 360" },
     { "path": "01-CAMARAS/CAM-05-DJI-OSMO-PROXY-960x960-20fps.bat", "required": true, "role": "Camara 05 DJI OSMO" },
@@ -33,6 +34,12 @@
     { "path": "tools/Test-Scripts.ps1", "required": true, "role": "Motor de diagnostico" },
     { "path": "tools/Test-ProxyIntegrity.ps1", "required": true, "role": "Verificador de integridad y cambios de originales" },
     { "path": "tools/Update-Scripts.ps1", "required": true, "role": "Actualizador seguro" },
+    { "path": "tools/QooCamAutomation/QooCam_VR180_Batch_AntiShake.exe", "required": true, "role": "Automatizador QooCam portable" },
+    { "path": "tools/QooCamAutomation/qcam_batch_automator.py", "required": true, "role": "Codigo fuente del automatizador QooCam" },
+    { "path": "tools/QooCamAutomation/test_batch_inputs.py", "required": false, "role": "Pruebas del automatizador QooCam" },
+    { "path": "tools/QooCamAutomation/QooCam_VR180_Batch_AntiShake.spec", "required": true, "role": "Compilacion del automatizador QooCam" },
+    { "path": "tools/QooCamAutomation/qcam.ico", "required": true, "role": "Icono del automatizador QooCam" },
+    { "path": "tools/QooCamAutomation/README.md", "required": true, "role": "Documentacion del automatizador QooCam" },
     { "path": "docs/README.md", "required": true, "role": "Documentacion" },
     { "path": "docs/CHANGELOG.md", "required": true, "role": "Historial" },
     { "path": ".gitignore", "required": true, "role": "Exclusiones Git" },
