@@ -6,6 +6,10 @@
 - `TOOL-07-ESTADO-PROYECTOS` cuenta los proxies VR180 de cada proyecto.
 - `TOOL-06-ORGANIZAR-ORIGENES`: reconoce las carpetas del microfono copiadas tal cual de la mini SD (`TX02_MIC007_AAAAMMDD`), corrige el reloj del TX02 con 13 h (antes 12) y agrega `-Confirmar`, que muestra el plan y pregunta antes de mover.
 - Accesos de doble clic: `TOOL-06-1-ANALIZAR.bat`, `TOOL-06-2-MOVER-CON-CONFIRMACION.bat` y `TOOL-06-3-AUTOMATICO.bat`.
+- Nueva carpeta `04-PREMIERE` para los scripts de Premiere, que antes estaban sueltos en la raiz: `PPRO-01-CORTAR-AUDIO-POR-SRT.jsx` (antes `Cortar_Audio_SRT_V7.jsx`), `PPRO-02-CERRAR-HUECOS-SIN-VIDEO.jsx` y `PPRO-03-DIAGNOSTICO-API.jsx`.
+- `PPRO-02` cierra de una vez todos los tramos sin video usando la extraccion de Premiere, que tambien corre los subtitulos. Pide las marcas de entrada y salida de modo que Premiere las guarde exactas: pedidas en el segundo exacto, algunas caian un tick antes y el video perdia un fotograma.
+- Se incluye `tools/SilverBulletAutomation/vr180_batch_automator.py`, el automatizador que exporta los `.OSV` de la DJI con VR180 Silver Bullet.
+- El automatizador QooCam ya no se interrumpe si la consola no puede imprimir acentos. El cambio esta en el codigo fuente; el ejecutable incluido aun no se ha recompilado con el.
 
 ## 2026.10.11.1
 
