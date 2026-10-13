@@ -23,6 +23,8 @@ while ($true) {
     Write-Host ' 5. Diagnostico de instalacion (no renderiza)'
     Write-Host ' 6. Actualizar desde GitHub'
     Write-Host ' 7. Herramientas adicionales'
+    Write-Host ' 8. Organizar grabaciones nuevas en su carpeta de proyecto'
+    Write-Host ' 9. Estado: que le falta a cada proyecto (no modifica nada)'
     Write-Host ' 0. Salir'
     Write-Host ''
     $choice = Read-Host 'Selecciona una opcion'
@@ -43,6 +45,19 @@ while ($true) {
                 Write-Host '  TOOL-02: recolector de Pics Proxy'
                 Write-Host '  TOOL-03: copias de respaldo'
                 Write-Host '  TOOL-05: verificador de fila unica'
+            }
+            '8' {
+                $target = Read-Host 'Disco o carpeta raiz de los proyectos (ENTER = G:\)'
+                if ([string]::IsNullOrWhiteSpace($target)) { $target = 'G:' }
+                [void](Invoke-PowerShellFile '03-HERRAMIENTAS\TOOL-06-ORGANIZAR-ORIGENES.ps1' @('-Root', $target))
+                $answer = Read-Host 'Escribe SI para mover segun el plan mostrado (cualquier otra cosa cancela)'
+                if ($answer -ceq 'SI') { [void](Invoke-PowerShellFile '03-HERRAMIENTAS\TOOL-06-ORGANIZAR-ORIGENES.ps1' @('-Root', $target, '-Aplicar')) }
+                else { Write-Host 'No se movio nada.' -ForegroundColor Yellow }
+            }
+            '9' {
+                $target = Read-Host 'Disco o carpeta raiz de los proyectos (ENTER = G:\)'
+                if ([string]::IsNullOrWhiteSpace($target)) { $target = 'G:' }
+                [void](Invoke-PowerShellFile '03-HERRAMIENTAS\TOOL-07-ESTADO-PROYECTOS.ps1' @('-Root', $target))
             }
             '0' { exit 0 }
             default { Write-Host 'Opcion no valida.' -ForegroundColor Yellow }

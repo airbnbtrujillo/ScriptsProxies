@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.10.11.1",
+  "version": "2026.10.13.1",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },
@@ -31,6 +31,12 @@
     { "path": "03-HERRAMIENTAS/TOOL-04-WATCHDOG-BAT.ps1", "required": false, "role": "Watchdog legado" },
     { "path": "03-HERRAMIENTAS/TOOL-05-EJECUTAR-VERIFICADOR.bat", "required": false, "role": "Lanzador verificador" },
     { "path": "03-HERRAMIENTAS/TOOL-05-VERIFICAR-FILA-UNICA.ps1", "required": false, "role": "Verificador fila unica" },
+    { "path": "03-HERRAMIENTAS/TOOL-06-ORGANIZAR-ORIGENES.ps1", "required": false, "role": "Organizador de grabaciones por dia y proyecto" },
+    { "path": "03-HERRAMIENTAS/TOOL-06-1-ANALIZAR.bat", "required": false, "role": "Organizador: solo analisis" },
+    { "path": "03-HERRAMIENTAS/TOOL-06-2-MOVER-CON-CONFIRMACION.bat", "required": false, "role": "Organizador: mover con confirmacion" },
+    { "path": "03-HERRAMIENTAS/TOOL-06-3-AUTOMATICO.bat", "required": false, "role": "Organizador: mover sin preguntar" },
+    { "path": "03-HERRAMIENTAS/TOOL-07-ESTADO-PROYECTOS.ps1", "required": false, "role": "Informe de pendientes por proyecto y camara" },
+    { "path": "tools/SilverBulletAutomation/vr180_batch_automator.py", "required": false, "role": "Automatizador DJI Osmo 360 (VR180 Silver Bullet)" },
     { "path": "tools/Test-Scripts.ps1", "required": true, "role": "Motor de diagnostico" },
     { "path": "tools/Test-ProxyIntegrity.ps1", "required": true, "role": "Verificador de integridad y cambios de originales" },
     { "path": "tools/Update-Scripts.ps1", "required": true, "role": "Actualizador seguro" },

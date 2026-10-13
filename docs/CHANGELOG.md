@@ -1,5 +1,12 @@
 # Cambios
 
+## 2026.10.13.1
+
+- DJI OSMO: nuevo proxy VR180 por clip en `CAM_001\Proxy DJI OSMO VR180`. Estira las dos lentes del LRF (ojo de pez) a la misma proyeccion del exportado SBS 8K con `ffmpeg v360`, sin tocar el OSV ni esperar el exportado. Cada proxy se llama igual que su exportado mas `_Proxy` (`CAM_..._D_SBS_Proxy.mp4`). Sale a 2048x1024 y 25 fps, con el color crudo de la camara.
+- `TOOL-07-ESTADO-PROYECTOS` cuenta los proxies VR180 de cada proyecto.
+- `TOOL-06-ORGANIZAR-ORIGENES`: reconoce las carpetas del microfono copiadas tal cual de la mini SD (`TX02_MIC007_AAAAMMDD`), corrige el reloj del TX02 con 13 h (antes 12) y agrega `-Confirmar`, que muestra el plan y pregunta antes de mover.
+- Accesos de doble clic: `TOOL-06-1-ANALIZAR.bat`, `TOOL-06-2-MOVER-CON-CONFIRMACION.bat` y `TOOL-06-3-AUTOMATICO.bat`.
+
 ## 2026.10.11.1
 
 - Se integra el render QooCam VR180 antes del flujo de proxies, tanto en el orquestador completo como en la ejecucion de una sola camara.

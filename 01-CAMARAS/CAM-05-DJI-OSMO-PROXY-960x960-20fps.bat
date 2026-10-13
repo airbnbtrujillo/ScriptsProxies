@@ -22,6 +22,15 @@ set "TEMP_DIR=Proxy DJI OSMO RAW"
 set "PROXY_SUFFIX=_DJIProxy_LEFT_960x960_20fps.mp4"
 set "DUAL_DIR=Proxy DJI OSMO DUAL"
 set "DUAL_SUFFIX=_DJI_DUAL_PREVIEW_2048x1024_25fps.mp4"
+REM Proxy VR180: las dos lentes del LRF pasadas de ojo de pez a la misma
+REM proyeccion del exportado SBS 8K, para editar sin esperar ese exportado.
+REM VR_FOV es el angulo de lente que mejor calza con el SBS (medido con SSIM).
+set "VR_DIR=Proxy DJI OSMO VR180"
+REM Mismo nombre que el exportado (CAM_..._D_SBS.mp4) mas _Proxy, como espera Premiere.
+set "VR_SUFFIX=_SBS_Proxy.mp4"
+set "VR_FOV=187"
+set "VR_EYE=v360=input=fisheye:output=hequirect:ih_fov=%VR_FOV%:iv_fov=%VR_FOV%"
+set "VF_VR180=split[a][b];[a]crop=iw/2:ih:0:0,%VR_EYE%[l];[b]crop=iw/2:ih:iw/2:0,%VR_EYE%[r];[l][r]hstack,format=yuv420p[v]"
 set "FILELIST=%ROOT%\filelist_dji_osmo.txt"
 set "MANIFEST=%ROOT%\_concat_manifest_dji_osmo.txt"
 set "SIGN_FILE=%ROOT%\_concat_sig_dji_osmo_overlay_v6_top_white.txt"
@@ -93,6 +102,8 @@ if errorlevel 1 (
 
 if not exist "%TEMP_DIR%" mkdir "%TEMP_DIR%" >nul 2>&1
 if not exist "%DUAL_DIR%" mkdir "%DUAL_DIR%" >nul 2>&1
+if not exist "%VR_DIR%" mkdir "%VR_DIR%" >nul 2>&1
+set /a VR_IDX=0
 
 set "OUT_FILE=%PROJECT% DJI OSMO RAW Proxy Complete.mp4"
 set "OUT_FULL=%PROJECT_DIR%\%OUT_FILE%"
@@ -200,6 +211,7 @@ if %DUAL_IDX% GTR 0 (
   echo   Dual:    "%ROOT%\%DUAL_DIR%"
   echo   Preview: "%DUAL_OUT_FULL%"
 )
+if %VR_IDX% GTR 0 echo   VR180:   "%ROOT%\%VR_DIR%" ^(%VR_IDX% proxies^)
 echo DONE>>"%LOG%"
 goto END
 
@@ -211,6 +223,7 @@ set "OUT=%ROOT%\%TEMP_DIR%\!BASE!%PROXY_SUFFIX%"
 set "OUT_UNIX=!OUT:\=/!"
 set "DUAL_OUT=%ROOT%\%DUAL_DIR%\!BASE!%DUAL_SUFFIX%"
 set "DUAL_OUT_UNIX=!DUAL_OUT:\=/!"
+set "VR_OUT=%ROOT%\%VR_DIR%\!BASE!%VR_SUFFIX%"
 set "VF_USE=%VF_LRF%"
 if /I "!EXT!"==".OSV" set "VF_USE=%VF_OSV%"
 
@@ -266,6 +279,23 @@ if /I "!EXT!"==".LRF" (
     )
     >>"%DUAL_MANIFEST%" echo !DFSZ!^|!DFTS!^|!DUAL_OUT_UNIX!
   )
+  if exist "!VR_OUT!" (
+    echo([SKIP] !BASE! proxy VR180 existe.
+    echo SKIP VR180 "!VR_OUT!">>"%LOG%"
+  ) else (
+    echo([VR180] !BASE! ^(LRF estirado a la proyeccion del SBS^)
+    echo Procesando VR180 "%IN%" ^> "!VR_OUT!">>"%LOG%"
+    "%FFMPEG%" -y -hide_banner -loglevel warning -stats -i "%IN%" ^
+      -filter_complex "[0:v:0]%VF_VR180%" -map "[v]" -map 0:a? ^
+      -c:v %V_CODEC% -cq 26 -b:v 6M -maxrate 9M -bufsize 9M -pix_fmt yuv420p -preset %V_PRESET% ^
+      -c:a copy -movflags +faststart "!VR_OUT!"
+    if errorlevel 1 (
+      echo([ERROR] ffmpeg fallo creando VR180 para !BASE!
+      echo ERROR VR180 ffmpeg "%IN%">>"%LOG%"
+      if exist "!VR_OUT!" del /q "!VR_OUT!" 2>nul
+    )
+  )
+  if exist "!VR_OUT!" set /a VR_IDX+=1
 )
 
 if exist "!OUT!" (
