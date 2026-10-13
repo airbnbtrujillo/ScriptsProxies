@@ -27,6 +27,15 @@ try:
 except Exception:
     pass
 
+# Los mensajes de estado llevan acentos y guiones Unicode. Con --run la salida
+# puede ir a un archivo o a una consola cp1252, incapaz de codificarlos; sin
+# esto, imprimir un estado aborta la configuracion a medio camino.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 from pywinauto import Desktop, keyboard, mouse
 import win32con
 import win32gui
@@ -1491,7 +1500,11 @@ def run_with_indicator(jobs):
     cancel = threading.Event()
     indicator = AutomationIndicator(root, cancel)
     def status(message):
-        print(message, flush=True)
+        try:
+            print(message, flush=True)
+        except Exception:
+            # Un fallo al imprimir jamas debe interrumpir el flujo de QooCam.
+            logging.exception("No se pudo imprimir el estado")
         indicator.update(message)
     result = {"code": 0}
     def worker():
