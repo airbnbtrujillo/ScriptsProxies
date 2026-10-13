@@ -287,7 +287,7 @@ if /I "!EXT!"==".LRF" (
     echo Procesando VR180 "%IN%" ^> "!VR_OUT!">>"%LOG%"
     "%FFMPEG%" -y -hide_banner -loglevel warning -stats -i "%IN%" ^
       -filter_complex "[0:v:0]%VF_VR180%" -map "[v]" -map 0:a? ^
-      -c:v %V_CODEC% -cq 26 -b:v 6M -maxrate 9M -bufsize 9M -pix_fmt yuv420p -preset %V_PRESET% ^
+      -c:v %V_CODEC% -cq 26 -b:v 6M -maxrate 9M -bufsize 9M -g 25 -bf 0 -pix_fmt yuv420p -preset %V_PRESET% ^
       -c:a copy -movflags +faststart "!VR_OUT!"
     if errorlevel 1 (
       echo([ERROR] ffmpeg fallo creando VR180 para !BASE!
