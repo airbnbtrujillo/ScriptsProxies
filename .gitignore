@@ -11,3 +11,7 @@ overlay.ass
 overlay.srt
 filelist*.txt
 __pycache__/
+
+# Informes que los scripts de Premiere escriben junto a si mismos
+*_diagnostico.txt
+Diagnostico_API_Premiere.txt
