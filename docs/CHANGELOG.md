@@ -1,5 +1,10 @@
 # Cambios
 
+## 2026.10.15.1
+
+- QOOCAM valida con `ffprobe` cada proxy y `Right25` antes de reutilizarlo. Un archivo incompleto, vacío o sin vídeo se guarda en `_HISTORICO\<fecha-hora>` de su propia carpeta y se vuelve a crear; los originales nunca se modifican.
+- Los renders intermedios QOOCAM ahora se hacen como `.partial.mp4` y solo se instalan con su nombre definitivo después de validar vídeo. Si se corta el proceso o falla GPU, no queda un proxy vacío que bloquee futuras ejecuciones.
+
 ## 2026.10.13.1
 
 - DJI OSMO: nuevo proxy VR180 por clip en `CAM_001\Proxy DJI OSMO VR180`. Estira las dos lentes del LRF (ojo de pez) a la misma proyeccion del exportado SBS 8K con `ffmpeg v360`, sin tocar el OSV ni esperar el exportado. Cada proxy se llama igual que su exportado mas `_Proxy` (`CAM_..._D_SBS_Proxy.mp4`). Sale a 2048x1024 y 25 fps, con el color crudo de la camara.

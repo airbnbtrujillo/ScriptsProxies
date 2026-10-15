@@ -12,12 +12,13 @@ pushd "%~dp0" || (
 set "_DID_PUSHD=1"
 
 REM =================================================
-REM  QOOCAM Proxy Keeper v5
+REM  QOOCAM Proxy Keeper v6
 REM  - Proxy nuevo corto:   <BASE>_proxy.mp4
 REM  - Acepta proxy legado: <BASE>_proxy_1920x960_30fps.mp4
-REM  - SIN parentesis en echo dentro de bloques (evita parse bugs)
+REM  - Valida archivos existentes con ffprobe antes de reutilizarlos
+REM  - Archiva resultados incompletos/corruptos; nunca toca los originales
 REM =================================================
-set "SCRIPT_VER=QOOCAM Proxy Keeper v5 [skip final estable]"
+set "SCRIPT_VER=QOOCAM Proxy Keeper v6 [validacion y recuperacion segura]"
 echo([INFO] %SCRIPT_VER%
 
 REM ==================== CONFIG ====================
@@ -49,6 +50,7 @@ set "A_AR_RIGHT=16000"
 set "A_CH_RIGHT=1"
 
 set "EXTS=mp4 mov mkv m4v"
+for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "RUN_STAMP=%%I"
 REM =================================================
 
 REM ====== Salida raiz E:\<TOP>\<TOP> ======
@@ -243,7 +245,13 @@ if "%USE_GPU%"=="1" (
 ffmpeg -hide_banner -loglevel error -stats -y -f concat -safe 0 -i list_right.txt ^
   -vf "!SUBFILTER!,fps=%FPS_RIGHT%,format=yuv420p" !VENC_FINAL! -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -movflags +faststart "%OUT_PATH%"
 
-if exist "%OUT_PATH%" ( echo([OK] Final creado: "%OUT_PATH%" ) else ( echo([ERROR] No se pudo crear el final.) )
+if not exist "%OUT_PATH%" goto :FINAL_ERROR
+echo([OK] Final creado: "%OUT_PATH%"
+goto :END
+
+:FINAL_ERROR
+echo([ERROR] No se pudo crear el final.
+goto :END
 
 :END
 if "%PAUSE_AT_END%"=="1" pause
@@ -279,6 +287,14 @@ echo([FILE] !BASE!
 REM 1) RESOLVER/CREAR PROXY
 set "PROXY_PICK="
 call :RESOLVE_PROXY "!BASE!"
+if defined PROXY_PICK (
+  call :MEDIA_VALID "!PROXY_PICK!" PROXY_VALID
+  if "!PROXY_VALID!"=="0" (
+    echo(  [WARN] Proxy existente invalido. Se archiva y se vuelve a crear.
+    call :ARCHIVE_INVALID "!PROXY_PICK!"
+    set "PROXY_PICK="
+  )
+)
 
 if "%FILL_PROXIES%"=="1" (
   if defined PROXY_PICK (
@@ -287,15 +303,15 @@ if "%FILL_PROXIES%"=="1" (
     echo(  - Creando PROXY [nombre corto]...
     call :MAKE_PROXY "!IN_SRC!" "!OUT_PROXY_NEW!"
     if exist "!OUT_PROXY_NEW!" (
-      for %%S in ("!OUT_PROXY_NEW!") do set "SZ=%%~zS"
-      if "!SZ!"=="0" (
-        echo(  [ERR] Proxy 0 bytes. Eliminando...
-        del /q "!OUT_PROXY_NEW!" 2>nul
-        set /a FAIL_PROXY+=1
-        if "%PAUSE_ON_ERROR%"=="1" pause
-      ) else (
+      call :MEDIA_VALID "!OUT_PROXY_NEW!" PROXY_VALID
+      if "!PROXY_VALID!"=="1" (
         set "PROXY_PICK=!OUT_PROXY_NEW!"
         set /a NEW_PROXY+=1
+      ) else (
+        echo(  [ERR] Proxy creado pero invalido. Se archiva para revision.
+        call :ARCHIVE_INVALID "!OUT_PROXY_NEW!"
+        set /a FAIL_PROXY+=1
+        if "%PAUSE_ON_ERROR%"=="1" pause
       )
     ) else (
       echo(  [ERR] No se pudo crear PROXY para !BASE!
@@ -319,22 +335,27 @@ if "%FILL_RIGHTS%"=="1" (
   )
 
   if exist "!OUT_RIGHT!" (
-    echo(  - Right ya existe: "!OUT_RIGHT!"
-    exit /b 0
+    call :MEDIA_VALID "!OUT_RIGHT!" RIGHT_VALID
+    if "!RIGHT_VALID!"=="1" (
+      echo(  - Right ya existe: "!OUT_RIGHT!"
+      exit /b 0
+    )
+    echo(  [WARN] Right existente invalido. Se archiva y se vuelve a crear.
+    call :ARCHIVE_INVALID "!OUT_RIGHT!"
   )
 
   echo(  - Creando RIGHT desde: "!PROXY_PICK!"
   call :MAKE_RIGHT "!PROXY_PICK!" "!OUT_RIGHT!"
 
   if exist "!OUT_RIGHT!" (
-    for %%S in ("!OUT_RIGHT!") do set "SZ=%%~zS"
-    if "!SZ!"=="0" (
-      echo(  [ERR] RIGHT 0 bytes. Eliminando...
-      del /q "!OUT_RIGHT!" 2>nul
+    call :MEDIA_VALID "!OUT_RIGHT!" RIGHT_VALID
+    if "!RIGHT_VALID!"=="1" (
+      set /a NEW_RIGHT+=1
+    ) else (
+      echo(  [ERR] RIGHT creado pero invalido. Se archiva para revision.
+      call :ARCHIVE_INVALID "!OUT_RIGHT!"
       set /a FAIL_RIGHT+=1
       if "%PAUSE_ON_ERROR%"=="1" pause
-    ) else (
-      set /a NEW_RIGHT+=1
     )
   ) else (
     echo(  [ERR] No se pudo crear RIGHT para !BASE!
@@ -363,41 +384,81 @@ exit /b 0
 
 :MEDIA_VALID
 set "%~2=0"
-for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=index -of csv^=p^=0 "%~1" 2^>nul`) do set "%~2=1"
+for %%A in ("%~1") do set "MEDIA_FILE=%%~fA"
+for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=index -of csv^=p^=0 "%MEDIA_FILE%" 2^>nul`) do set "%~2=1"
+exit /b 0
+
+
+:ARCHIVE_INVALID
+for %%A in ("%~1") do set "BAD_FILE=%%~fA"
+if not exist "%BAD_FILE%" exit /b 0
+for %%A in ("%BAD_FILE%") do set "BAD_DIR=%%~dpA"
+set "HIST_DIR=%BAD_DIR%_HISTORICO\%RUN_STAMP%"
+if not exist "%HIST_DIR%" md "%HIST_DIR%" 2>nul
+move /y "%BAD_FILE%" "%HIST_DIR%\%~nx1" >nul
+if exist "%BAD_FILE%" (
+  echo(  [WARN] No se pudo archivar: "%BAD_FILE%"
+) else (
+  echo(  [KEEP] Archivo invalido guardado en: "%HIST_DIR%\%~nx1"
+)
 exit /b 0
 
 
 :MAKE_PROXY
 set "SRC=%~1"
-set "DST=%~2"
+for %%A in ("%~2") do set "DST=%%~fA"
+set "TMP=%DST%.partial.mp4"
+del /q "%TMP%" 2>nul
 
 if "%USE_GPU%"=="1" (
   ffmpeg -hide_banner -loglevel error -stats -y %HWDEC_GPU% -i "%SRC%" ^
-    -vf "%FC_PROXY_GPU%" -r %FPS_PROXY% %VENC_PROXY_GPU% -c:a aac -b:a %A_BR_PROXY% -map 0:v:0 -map 0:a? -movflags +faststart "%DST%"
-  if exist "%DST%" exit /b 0
+    -vf "%FC_PROXY_GPU%" -r %FPS_PROXY% %VENC_PROXY_GPU% -c:a aac -b:a %A_BR_PROXY% -map 0:v:0 -map 0:a? -movflags +faststart "%TMP%"
+  set "TMP_READY=0"
+  if exist "%TMP%" for %%S in ("%TMP%") do if %%~zS gtr 0 set "TMP_READY=1"
+  if "!TMP_READY!"=="1" (
+    move /y "%TMP%" "%DST%" >nul
+    exit /b 0
+  )
+  del /q "%TMP%" 2>nul
   echo(    [WARN] PROXY GPU fallo - reintento CPU
 )
 
 ffmpeg -hide_banner -loglevel error -stats -y -i "%SRC%" ^
-  -vf "%FC_PROXY_CPU%" -r %FPS_PROXY% %VENC_PROXY_CPU% -c:a aac -b:a %A_BR_PROXY% -map 0:v:0 -map 0:a? -movflags +faststart "%DST%"
+  -vf "%FC_PROXY_CPU%" -r %FPS_PROXY% %VENC_PROXY_CPU% -c:a aac -b:a %A_BR_PROXY% -map 0:v:0 -map 0:a? -movflags +faststart "%TMP%"
+set "TMP_READY=0"
+if exist "%TMP%" for %%S in ("%TMP%") do if %%~zS gtr 0 set "TMP_READY=1"
+if "!TMP_READY!"=="1" move /y "%TMP%" "%DST%" >nul
+if exist "%TMP%" del /q "%TMP%" 2>nul
 exit /b 0
 
 
 :MAKE_RIGHT
 set "SRC=%~1"
-set "DST=%~2"
+for %%A in ("%~2") do set "DST=%%~fA"
+set "TMP=%DST%.partial.mp4"
+del /q "%TMP%" 2>nul
 
 if "%USE_GPU%"=="1" if defined FC_RIGHT_GPU (
   ffmpeg -hide_banner -loglevel error -stats -y %HWDEC_GPU% -i "%SRC%" ^
     -vf "%FC_RIGHT_GPU%" -r %FPS_RIGHT% %VENC_RIGHT_GPU% ^
-    -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -map 0:v:0 -map 0:a? -movflags +faststart "%DST%"
-  if exist "%DST%" exit /b 0
+    -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -map 0:v:0 -map 0:a? -movflags +faststart "%TMP%"
+  set "TMP_READY=0"
+  if exist "%TMP%" for %%S in ("%TMP%") do if %%~zS gtr 0 set "TMP_READY=1"
+  if "!TMP_READY!"=="1" (
+    move /y "%TMP%" "%DST%" >nul
+    exit /b 0
+  )
+  del /q "%TMP%" 2>nul
   echo(    [WARN] RIGHT GPU fallo - reintento CPU
 )
 
 ffmpeg -hide_banner -loglevel error -stats -y -i "%SRC%" ^
   -vf "%FC_RIGHT_CPU%" -r %FPS_RIGHT% %VENC_RIGHT_CPU% ^
-  -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -map 0:v:0 -map 0:a? -movflags +faststart "%DST%"
+  -c:a aac -b:a %A_BR_RIGHT% -ac %A_CH_RIGHT% -ar %A_AR_RIGHT% -map 0:v:0 -map 0:a? -movflags +faststart "%TMP%"
+set "TMP_READY=0"
+if exist "%TMP%" for %%S in ("%TMP%") do if %%~zS gtr 0 set "TMP_READY=1"
+if "!TMP_READY!"=="1" move /y "%TMP%" "%DST%" >nul
+if exist "%TMP%" del /q "%TMP%" 2>nul
 exit /b 0
 
 
