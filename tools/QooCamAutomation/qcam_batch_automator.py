@@ -1,3 +1,24 @@
+"""Automatizador de QooCam Studio para renders VR180 por lote.
+
+Contrato de entrada/salida:
+  * Lee originales MP4 de ``100QOOCAM``; ignora KDOutput, Proxies, Right25 e
+    historicos para no convertir sus propios resultados en nuevas entradas.
+  * Pide a QooCam Studio un render 180 3D Normal, 8K H.265 con Anti-Shake,
+    y deja los MP4 terminados en ``KDOutput``.
+  * Guarda un manifiesto para no repetir renders que ya fueron verificados.
+
+Adaptacion a otra computadora:
+  * No se deben introducir coordenadas fijas de pantalla. El código localiza
+    controles por UI Automation y, solo cuando QooCam/Qt no los expone,
+    calcula el clic a partir del rectángulo actual del control.
+  * ``prepare_editor`` centra la ventana con un tamaño estable y el proceso
+    activa DPI físico; eso evita que resolución, escala de Windows o segundo
+    monitor desplacen los clics.
+  * Si cambia una versión de QooCam, revisar primero las capturas y el log en
+    %LOCALAPPDATA%\\QooCamBatchAntiShake, luego modificar el selector o el
+    texto del control afectado. La guía completa está en README.md.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -177,7 +198,13 @@ def human_size(size: int) -> str:
 def discover_jobs(
     sources: Iterable[Path], output: Path | None = None, *, recursive: bool = True
 ):
-    """Buscar entradas sin seguir enlaces ni confundir resultados con originales."""
+    """Buscar entradas sin seguir enlaces ni confundir resultados con originales.
+
+    Esta es la lectura principal de archivos: se recorre cada fuente, se
+    descartan las carpetas que el flujo crea y se agrupan solo MP4 originales.
+    No abre ni mueve originales; el manifiesto decide después cuáles requieren
+    render y cuáles ya tienen un resultado válido.
+    """
     folders: dict[str, Path] = {}
     if output is not None:
         output = output.expanduser().resolve()

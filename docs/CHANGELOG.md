@@ -1,5 +1,9 @@
 # Cambios
 
+## 2026.10.15.2
+
+- Se documenta el automatizador QooCam: lectura de originales, manifiesto, salidas y cómo diagnosticar/adaptar la interfaz a otra pantalla sin introducir coordenadas fijas. La guía está en `tools/QooCamAutomation/README.md` y un resumen permanente al inicio de `qcam_batch_automator.py`.
+
 ## 2026.10.15.1
 
 - QOOCAM valida con `ffprobe` cada proxy y `Right25` antes de reutilizarlo. Un archivo incompleto, vacío o sin vídeo se guarda en `_HISTORICO\<fecha-hora>` de su propia carpeta y se vuelve a crear; los originales nunca se modifican.
