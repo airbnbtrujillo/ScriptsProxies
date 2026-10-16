@@ -1,5 +1,9 @@
 # Cambios
 
+## 2026.10.16.4
+
+- TOOL-08 ahora muestra la razón precisa si FFmpeg termina pero el proxy no supera la validación: lectura de dimensiones con `ffprobe` o tamaño real frente al 1/6 esperado.
+
 ## 2026.10.16.3
 
 - Nueva herramienta independiente `TOOL-08-FFMPEG-PROXIES-UN-SEISMO`: crea proxies H.264/AAC a un sexto de ancho y alto para edición, revisión o transporte. Conserva nombre, extensión y estructura de carpetas, nunca modifica originales y reutiliza proxies ya válidos.

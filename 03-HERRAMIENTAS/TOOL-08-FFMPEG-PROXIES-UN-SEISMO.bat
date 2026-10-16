@@ -129,7 +129,7 @@ exit /b 0
 
 :CREATE_FAILED
 if exist "!TMP!" del /q "!TMP!" 2>nul
-echo(  [ERROR] No se pudo crear un proxy valido.
+echo(  [ERROR] No se pudo crear un proxy valido: !PROXY_REASON!
 set /a FAILED+=1
 exit /b 0
 
@@ -137,6 +137,7 @@ exit /b 0
 :PROXY_VALID
 REM %1 original, %2 proxy, %3 variable resultado. Exige video y dimensiones 1/6.
 set "%~3=0"
+set "PROXY_REASON=el archivo proxy no existe"
 if not exist "%~2" exit /b 0
 set "IW="
 set "IH="
@@ -146,13 +147,30 @@ for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_en
 for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=height -of csv^=p^=0 "%~1" 2^>nul`) do set "IH=%%V"
 for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=width -of csv^=p^=0 "%~2" 2^>nul`) do set "OW=%%V"
 for /f "usebackq delims=" %%V in (`ffprobe -v error -select_streams v:0 -show_entries stream^=height -of csv^=p^=0 "%~2" 2^>nul`) do set "OH=%%V"
-if not defined IW exit /b 0
-if not defined IH exit /b 0
-if not defined OW exit /b 0
-if not defined OH exit /b 0
+if not defined IW (
+  set "PROXY_REASON=ffprobe no pudo leer el ancho del original"
+  exit /b 0
+)
+if not defined IH (
+  set "PROXY_REASON=ffprobe no pudo leer el alto del original"
+  exit /b 0
+)
+if not defined OW (
+  set "PROXY_REASON=ffprobe no pudo leer el ancho del proxy"
+  exit /b 0
+)
+if not defined OH (
+  set "PROXY_REASON=ffprobe no pudo leer el alto del proxy"
+  exit /b 0
+)
 set /a EW=IW/6/2*2
 set /a EH=IH/6/2*2
-if "!OW!"=="!EW!" if "!OH!"=="!EH!" set "%~3=1"
+if "!OW!"=="!EW!" if "!OH!"=="!EH!" (
+  set "%~3=1"
+  set "PROXY_REASON=valido (!OW!x!OH!)"
+  exit /b 0
+)
+set "PROXY_REASON=dimension proxy !OW!x!OH!; se esperaba !EW!x!EH! desde original !IW!x!IH!"
 exit /b 0
 
 
