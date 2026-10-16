@@ -1,5 +1,10 @@
 # Cambios
 
+## 2026.10.16.1
+
+- Se documentan con capturas reales 180 3D Normal, VR180, Anti-Shake, Export Settings y Export Completed.
+- Se registra la comprobacion tecnica de las salidas HEVC 7680x3840, estereo y bitrate alto.
+
 ## 2026.10.15.2
 
 - Se documenta el automatizador QooCam: lectura de originales, manifiesto, salidas y cómo diagnosticar/adaptar la interfaz a otra pantalla sin introducir coordenadas fijas. La guía está en `tools/QooCamAutomation/README.md` y un resumen permanente al inicio de `qcam_batch_automator.py`.

@@ -1,6 +1,6 @@
 # Scripts de proxies y GIF
 
-Version instalada: `2026.10.13.1`.
+Version instalada: `2026.10.16.1`.
 
 ## Inicio rapido
 
@@ -124,6 +124,8 @@ git -C C:\ScriptsProxies pull --ff-only
 El actualizador valida la descarga y guarda los archivos reemplazados o retirados en `archive\updates`.
 
 QooCam Studio se detecta automaticamente en sus ubicaciones habituales. Si otra computadora lo tiene instalado en una ruta diferente, define `QooCamStudioExe` en `config\settings.json`. Si la interfaz cambia por version o escala de pantalla, corrige el codigo fuente incluido en `tools\QooCamAutomation`, prueba en esa computadora y publica la correccion por Git para que ambas usen el mismo programa.
+
+La evidencia visual y la lista exacta de ajustes estan en `docs\QOOCAM-SETTINGS-VERIFICADOS.md`.
 
 ## Diagnostico sin render
 

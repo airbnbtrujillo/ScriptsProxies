@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.10.13.1",
+  "version": "2026.10.16.1",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },
@@ -51,6 +51,12 @@
     { "path": "tools/QooCamAutomation/qcam.ico", "required": true, "role": "Icono del automatizador QooCam" },
     { "path": "tools/QooCamAutomation/README.md", "required": true, "role": "Documentacion del automatizador QooCam" },
     { "path": "docs/README.md", "required": true, "role": "Documentacion" },
+    { "path": "docs/QOOCAM-SETTINGS-VERIFICADOS.md", "required": true, "role": "Evidencia de ajustes QooCam" },
+    { "path": "docs/QooCam-Evidence/01-180-3D-Normal-menu.png", "required": true, "role": "Captura modo 180 3D Normal" },
+    { "path": "docs/QooCam-Evidence/02-VR180-activo.png", "required": true, "role": "Captura VR180 activo" },
+    { "path": "docs/QooCam-Evidence/03-AntiShake-verificado.png", "required": true, "role": "Captura Anti-Shake" },
+    { "path": "docs/QooCam-Evidence/04-Export-Settings.png", "required": true, "role": "Captura ajustes de exportacion" },
+    { "path": "docs/QooCam-Evidence/05-Export-Completed.png", "required": true, "role": "Captura exportacion completada" },
     { "path": "docs/CHANGELOG.md", "required": true, "role": "Historial" },
     { "path": ".gitignore", "required": true, "role": "Exclusiones Git" },
     { "path": "config/settings.json", "required": true, "role": "Configuracion local", "update": false },
