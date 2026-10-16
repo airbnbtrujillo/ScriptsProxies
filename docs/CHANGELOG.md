@@ -1,5 +1,9 @@
 # Cambios
 
+## 2026.10.16.5
+
+- TOOL-08 acepta el 1/6 con orientación intercambiada cuando FFmpeg aplica la metadata de rotación del original; así los videos verticales marcados dentro de un fotograma horizontal no se rechazan por error.
+
 ## 2026.10.16.4
 
 - TOOL-08 ahora muestra la razón precisa si FFmpeg termina pero el proxy no supera la validación: lectura de dimensiones con `ffprobe` o tamaño real frente al 1/6 esperado.

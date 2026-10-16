@@ -165,12 +165,19 @@ if not defined OH (
 )
 set /a EW=IW/6/2*2
 set /a EH=IH/6/2*2
+REM FFmpeg respeta la metadata de rotacion: un original 1280x720 marcado como
+REM vertical produce 120x212. Ambas orientaciones son el mismo 1/6 valido.
 if "!OW!"=="!EW!" if "!OH!"=="!EH!" (
   set "%~3=1"
   set "PROXY_REASON=valido (!OW!x!OH!)"
   exit /b 0
 )
-set "PROXY_REASON=dimension proxy !OW!x!OH!; se esperaba !EW!x!EH! desde original !IW!x!IH!"
+if "!OW!"=="!EH!" if "!OH!"=="!EW!" (
+  set "%~3=1"
+  set "PROXY_REASON=valido con rotacion (!OW!x!OH!)"
+  exit /b 0
+)
+set "PROXY_REASON=dimension proxy !OW!x!OH!; se esperaba !EW!x!EH! o !EH!x!EW! con rotacion, desde original !IW!x!IH!"
 exit /b 0
 
 
