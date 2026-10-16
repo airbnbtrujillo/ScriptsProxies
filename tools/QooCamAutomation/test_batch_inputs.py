@@ -18,7 +18,7 @@ class BatchInputsTests(unittest.TestCase):
         self.source.mkdir(parents=True)
         self.video = self.source / "Q360_20260902_180032_000002.MP4"
         self.video.write_bytes(b"original")
-        self.output = self.source / "QooCam_180_3D_Normal_AntiShake_HQ"
+        self.output = self.source
 
     def test_recursive_overlapping_inputs_are_deduplicated(self):
         jobs = discover_jobs([self.root, self.source])
@@ -41,7 +41,7 @@ class BatchInputsTests(unittest.TestCase):
         other = self.root / 'renamed'
         other.mkdir()
         (other / 'Cooking original.mp4').write_bytes(b'original')
-        self.assertIn((other, other / 'QooCam_180_3D_Normal_AntiShake_HQ'),
+        self.assertIn((other, other),
                       discover_jobs([self.root]))
 
     def test_direct_mode_ignores_kdoutput_and_nested_videos(self):
@@ -51,10 +51,10 @@ class BatchInputsTests(unittest.TestCase):
         nested = self.source / 'nested'
         nested.mkdir()
         (nested / 'Other original.mp4').write_bytes(b'other')
-        self.assertEqual(
-            discover_jobs([self.source], kdoutput, recursive=False),
-            [(self.source, kdoutput)],
-        )
+        self.assertEqual(discover_jobs([self.source], recursive=False),
+                         [(self.source, self.source)])
+        with self.assertRaises(AutomationError):
+            discover_jobs([self.source], kdoutput, recursive=False)
         recursive_sources = [source for source, _ in discover_jobs([self.source])]
         self.assertNotIn(kdoutput, recursive_sources)
         self.assertIn(nested, recursive_sources)
@@ -70,7 +70,6 @@ class BatchInputsTests(unittest.TestCase):
             discover_jobs([self.root], self.root / "shared")
 
     def test_existing_unverified_is_not_overwritten(self):
-        self.output.mkdir()
         group = scan_recordings(self.source)[0]
         (self.output / group.expected_output_name).write_bytes(b"incomplete")
         self.assertEqual(job_report(self.source, self.output)["groups"][0]["state"],
@@ -79,7 +78,6 @@ class BatchInputsTests(unittest.TestCase):
             QooCamAutomator(self.source, self.output, lambda _: None, threading.Event())
 
     def test_completed_requires_same_settings_and_file_size(self):
-        self.output.mkdir()
         group = scan_recordings(self.source)[0]
         result = self.output / group.expected_output_name
         result.write_bytes(b"0" * 1_000_001)
@@ -96,7 +94,6 @@ class BatchInputsTests(unittest.TestCase):
         self.assertFalse(is_completed(group, self.output, manifest))
 
     def test_changed_verified_output_is_archivable_not_unverified_conflict(self):
-        self.output.mkdir()
         group = scan_recordings(self.source)[0]
         result = self.output / group.expected_output_name
         result.write_bytes(b"0" * 1_000_001)
@@ -112,7 +109,6 @@ class BatchInputsTests(unittest.TestCase):
         self.assertEqual(automator.stale_outputs, [scan_recordings(self.source)[0]])
 
     def test_adopts_only_existing_outputs_that_pass_media_validation(self):
-        self.output.mkdir()
         group = scan_recordings(self.source)[0]
         result = self.output / group.expected_output_name
         result.write_bytes(b"0" * 1_000_001)

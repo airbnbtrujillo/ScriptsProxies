@@ -12,7 +12,7 @@ Evidencia obtenida durante pruebas reales del ejecutable entre el 27 y el 29 de 
 | Formato | `MP4(H265)` | Se vuelve a leer antes de Export. |
 | Bitrate | `High` | Se vuelve a leer antes de Export. |
 | Audio | `Stereo Audio` | Se vuelve a leer antes de Export. |
-| Salida | `Specified Directory` | Se confirma la ruta completa de `KDOutput`. |
+| Salida | `Same directory as the source material` | El `_Output.mp4` queda junto al original. |
 
 ## 1. Modo 180 3D Normal
 
@@ -32,13 +32,38 @@ El panel `Stabilization` muestra **Anti-shake** seleccionado. Los videos aparece
 
 ![Anti-Shake verificado](QooCam-Evidence/03-AntiShake-verificado.png)
 
-## 4. Ajustes completos de exportacion
+## 4. Ajustes de calidad comprobados anteriormente
 
-La captura confirma simultaneamente `7680x3840`, `MP4(H265)`, bitrate `High`, `Specified Directory` y `Stereo Audio`.
+La captura histórica confirma `7680x3840`, `MP4(H265)`, bitrate `High` y `Stereo Audio`. La ruta `Specified Directory` que aparece en esta evidencia fue reemplazada en la versión 1.9.0 por `Same directory as the source material`.
 
 ![Export Settings](QooCam-Evidence/04-Export-Settings.png)
 
-## 5. Exportacion completada
+## 5. Ruta nueva: misma carpeta del original
+
+La opcion obligatoria actual es **Same directory as the source material**. Aunque la captura de referencia muestre bitrate `Standard`, el automatizador selecciona y vuelve a comprobar `High` antes de exportar.
+
+![Same directory as the source material](QooCam-Evidence/06-Same-directory-source.png)
+
+## 6. Aviso de reinicio
+
+Al elegir `180 3D Normal`, QooCam puede pedir reiniciar la aplicación. El programa pulsa `OK`, vuelve a `File > Home` y abre el proyecto más reciente.
+
+![Restart required](QooCam-Evidence/07-Restart-required.png)
+
+## 7. Variacion Feedback / Send
+
+En algunas computadoras QooCam se cierra durante la configuración y al abrirse presenta la ventana `Feedback`. El procedimiento obligatorio es:
+
+1. Encontrar exactamente la casilla `Send error report`.
+2. Dejarla **desmarcada**.
+3. Confirmar por automatización que su estado es desmarcado.
+4. Guardar una captura de referencia local.
+5. Pulsar `Send` y volver a abrir QooCam.
+6. Recuperar el proyecto ya creado y continuar desde el paso pendiente.
+
+Si la otra computadora usa textos o controles diferentes, el automatizador se detiene sin enviar el reporte. La captura generada se guarda como `04-feedback-send-report-desmarcado.png` en `%LOCALAPPDATA%\QooCamBatchAntiShake\screenshots` y sirve para adaptar esa instalación.
+
+## 8. Exportacion completada
 
 El ejecutable termino la prueba y QooCam mostro `Export Completed`.
 

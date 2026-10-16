@@ -125,7 +125,13 @@ function Get-Profiles([IO.DirectoryInfo]$Project) {
 
     $qoo = Join-Path $p '100QOOCAM'
     $qooInput = Join-Path $qoo 'KDOutput'
-    $qooSources = @(Get-MediaFiles $qooInput $true)
+    $qooDirect = @(Get-MediaFiles $qoo $false | Where-Object {
+        $_.BaseName -match '(?i)_Output(?:\(\d+\))?$'
+    })
+    $qooLegacy = @(Get-MediaFiles $qooInput $true | Where-Object {
+        -not ($qooDirect.Name -contains $_.Name)
+    })
+    $qooSources = @($qooDirect) + @($qooLegacy)
     if ($qooSources.Count -or (Test-KnownCamera 'CAM-02')) {
         $proxyRoot = Join-Path $qoo 'Proxies'; $rightRoot = Join-Path $qoo 'Right25'
         $records = @($qooSources | ForEach-Object { New-SourceRecord $_ $p $_.BaseName })

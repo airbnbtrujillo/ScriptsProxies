@@ -4,7 +4,7 @@ Contrato de entrada/salida:
   * Lee originales MP4 de ``100QOOCAM``; ignora KDOutput, Proxies, Right25 e
     historicos para no convertir sus propios resultados en nuevas entradas.
   * Pide a QooCam Studio un render 180 3D Normal, 8K H.265 con Anti-Shake,
-    y deja los MP4 terminados en ``KDOutput``.
+    y deja cada ``*_Output.mp4`` junto a su video original.
   * Guarda un manifiesto para no repetir renders que ya fueron verificados.
 
 Adaptacion a otra computadora:
@@ -67,7 +67,7 @@ from pywinauto.timings import TimeoutError as PwaTimeoutError
 
 
 APP_NAME = "QooCam VR180 Batch AntiShake"
-APP_VERSION = "1.8.0"
+APP_VERSION = "1.9.0"
 QOOCAM_EXE: Path | None = None
 DEFAULT_SOURCE = Path(r"G:\243 - Ari Cumback\100QOOCAM")
 DEFAULT_OUTPUT_NAME = "QooCam_180_3D_Normal_AntiShake_HQ"
@@ -84,6 +84,7 @@ EXPORT_SETTINGS = {
     "mode": MODE_NAME, "resolution": "7680x3840", "format": "MP4(H265)",
     "bitrate": "High", "stabilization": "Anti-shake", "audio": "Stereo Audio",
     "linked_segments": "Single Import",
+    "output_path": "Same directory as the source material",
 }
 VIDEO_RE = re.compile(
     r"^(?P<prefix>Q360_\d{8}_\d{6})_(?P<part>\d{6})\.MP4$", re.IGNORECASE
@@ -227,8 +228,15 @@ def discover_jobs(
             "Hay videos en varias carpetas. Deja la salida vacía para guardar "
             "cada lote junto a sus originales, sin mezclar nombres."
         )
-    return [(folder, output or folder / DEFAULT_OUTPUT_NAME)
-            for _, folder in sorted(folders.items())]
+    jobs = []
+    for _, folder in sorted(folders.items()):
+        if output and output != folder:
+            raise AutomationError(
+                "La salida ahora es fija: la misma carpeta donde están los videos. "
+                "No indiques un directorio de salida diferente."
+            )
+        jobs.append((folder, folder))
+    return jobs
 
 
 def job_report(source: Path, output: Path) -> dict:
@@ -555,6 +563,7 @@ def close_feedback_if_present(pid: int) -> bool:
             checkbox.toggle()
         if checkbox.get_toggle_state() != 0:
             raise AutomationError("No pude desmarcar Send error report; no se pulsará Send")
+        menu_photo(window, "04-feedback-send-report-desmarcado")
         logging.info("Feedback: Send error report verificado desmarcado; pulsando Send")
         bring_to_front(window)
         send.click_input()
@@ -628,7 +637,7 @@ class QooCamAutomator:
 
         if self.stale_outputs:
             history = (
-                self.output.parent / "_HISTORICO"
+                self.source / "_HISTORICO"
                 / ("QooCamRenders_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
             )
             history.mkdir(parents=True, exist_ok=True)
@@ -908,6 +917,7 @@ class QooCamAutomator:
                 menu_photo(shell, "PAUSADO-normal-sin-aviso")
                 raise StepPausedError("Dos intentos sin confirmar el cambio; se pausa aquí") from exc
 
+        menu_photo(prompt, "04-restart-required")
         prompt.child_window(title="OK", control_type="Button").click_input()
         self.status("Aviso aceptado; esperando que el panel desaparezca…")
         wait_until(lambda: restart_prompt() is None, 30,
@@ -1230,7 +1240,7 @@ class QooCamAutomator:
             "resolutionWidget.resolutionSettingCell.resolutionComboBox": "7680x3840",
             "formatWidget.formatComboBox": "MP4(H265)",
             "bitrateWidget.widget.bitrateComboBox": "High",
-            "exportPathWidget.comboBoxPath": "Specified Directory",
+            "exportPathWidget.comboBoxPath": "Same directory as the source material",
             "audioWidget.audioComboBox": "Stereo Audio",
         }
         for suffix, value in combos.items():
@@ -1242,39 +1252,7 @@ class QooCamAutomator:
                     f"QooCam no aceptó {value!r}; quedó seleccionado {selected!r}"
                 )
 
-        path_button = self.main.child_window(
-            auto_id=base + "exportPathWidget.exportPathBtn"
-        )
-        path_button.click_input()
-        folder_dialog = wait_until(
-            lambda: find_common_dialog(pid, title_exclude="Select a file"),
-            15,
-            "el selector de carpeta de salida",
-            cancel=self.cancel,
-        )
-        bring_to_front(folder_dialog)
-        folder_edit = folder_dialog.child_window(control_id=1152, class_name="Edit")
-        if not folder_edit.exists(timeout=1):
-            edits = folder_dialog.descendants(class_name="Edit")
-            if not edits:
-                raise AutomationError("No pude localizar el campo de carpeta de salida")
-            folder_edit = edits[0]
-        folder_edit.set_edit_text(str(self.output))
-        if folder_edit.window_text().casefold() != str(self.output).casefold():
-            raise StepPausedError("El selector no aceptó la carpeta completa de salida")
-        folder_dialog.child_window(control_id=1, class_name="Button").click_input()
-
-        expected_path = str(self.output).replace("\\", "/").rstrip("/").casefold()
-        label = self.main.child_window(
-            auto_id=base + "exportPathWidget.exportPathBtn.container.textLabel"
-        )
-        wait_until(
-            lambda: self.output_label_matches(label.window_text(), expected_path),
-            10,
-            "la confirmación de la carpeta de salida",
-            cancel=self.cancel,
-        )
-
+        menu_photo(self.main, "05-export-settings-same-source")
         self.start_export()
 
     @staticmethod
@@ -1299,7 +1277,7 @@ class QooCamAutomator:
             "resolutionWidget.resolutionSettingCell.resolutionComboBox": "7680x3840",
             "formatWidget.formatComboBox": "MP4(H265)",
             "bitrateWidget.widget.bitrateComboBox": "High",
-            "exportPathWidget.comboBoxPath": "Specified Directory",
+            "exportPathWidget.comboBoxPath": "Same directory as the source material",
             "audioWidget.audioComboBox": "Stereo Audio",
         }
         self.render_log_path = self.qcam_log_path()
@@ -1571,7 +1549,7 @@ class AutomatorUI:
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
         self.source_var = tk.StringVar(value=str(source) if source else "")
-        self.output_var = tk.StringVar(value="")
+        self.output_var = tk.StringVar(value="Misma carpeta que cada video original")
         self.summary_var = tk.StringVar(value="Pulsa Analizar para revisar la carpeta.")
         self.status_var = tk.StringVar(value="Listo.")
         self.build_ui()
@@ -1604,13 +1582,13 @@ class AutomatorUI:
         )
         ttk.Button(form, text="Añadir carpeta…", command=self.browse_source).grid(row=1, column=1)
 
-        ttk.Label(form, text="Salida opcional (vacía: una salida junto a cada carpeta de originales)").grid(
+        ttk.Label(form, text="Salida fija: misma carpeta donde se encuentra cada video original").grid(
             row=2, column=0, sticky="w", pady=(12, 0)
         )
-        ttk.Entry(form, textvariable=self.output_var).grid(
+        ttk.Entry(form, textvariable=self.output_var, state="disabled").grid(
             row=3, column=0, sticky="ew", padx=(0, 8)
         )
-        ttk.Button(form, text="Examinar…", command=self.browse_output).grid(row=3, column=1)
+        ttk.Button(form, text="Fija", state="disabled").grid(row=3, column=1)
         form.columnconfigure(0, weight=1)
 
         settings = ttk.LabelFrame(frame, text="Configuración de exportación", padding=12)
@@ -1657,8 +1635,7 @@ class AutomatorUI:
                    if value.strip()]
         if not sources:
             raise AutomationError("Añade al menos una carpeta de entrada")
-        destination = self.output_var.get().strip()
-        return discover_jobs(sources, Path(destination) if destination else None)
+        return discover_jobs(sources)
 
     def browse_output(self) -> None:
         selected = filedialog.askdirectory(initialdir=self.output_var.get())
@@ -1823,7 +1800,7 @@ def main() -> int:
         QOOCAM_EXE = find_qoocam_exe(args.qoocam_exe)
     ui = AutomatorUI(root, sources[0] if sources else None)
     ui.source_var.set("; ".join(str(source) for source in sources))
-    ui.output_var.set(str(args.output) if args.output else "")
+    ui.output_var.set("Misma carpeta que cada video original")
     ui.analyze()
     if args.autostart:
         root.after(500, ui.start)

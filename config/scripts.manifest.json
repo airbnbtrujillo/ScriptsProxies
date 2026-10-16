@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "version": "2026.10.16.1",
+  "version": "2026.10.16.2",
   "entryPoint": "INICIAR-PROXY-Y-GIFS.cmd",
   "files": [
     { "path": "INICIAR-PROXY-Y-GIFS.cmd", "required": true, "role": "Unico lanzador de la raiz" },
@@ -57,6 +57,8 @@
     { "path": "docs/QooCam-Evidence/03-AntiShake-verificado.png", "required": true, "role": "Captura Anti-Shake" },
     { "path": "docs/QooCam-Evidence/04-Export-Settings.png", "required": true, "role": "Captura ajustes de exportacion" },
     { "path": "docs/QooCam-Evidence/05-Export-Completed.png", "required": true, "role": "Captura exportacion completada" },
+    { "path": "docs/QooCam-Evidence/06-Same-directory-source.png", "required": true, "role": "Captura salida junto al original" },
+    { "path": "docs/QooCam-Evidence/07-Restart-required.png", "required": true, "role": "Captura aviso de reinicio QooCam" },
     { "path": "docs/CHANGELOG.md", "required": true, "role": "Historial" },
     { "path": ".gitignore", "required": true, "role": "Exclusiones Git" },
     { "path": "config/settings.json", "required": true, "role": "Configuracion local", "update": false },

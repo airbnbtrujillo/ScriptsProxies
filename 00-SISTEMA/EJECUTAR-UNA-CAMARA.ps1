@@ -65,7 +65,7 @@ if ($PrepareOnly) {
 
 Write-Host ("[CAMARA] Ejecutando solo {0} en {1}" -f $camera.Name, $target) -ForegroundColor Green
 if ($camera.Id -eq 2) {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $qooRenderer -SourceDir $target -OutputDir (Join-Path $target 'KDOutput')
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $qooRenderer -SourceDir $target
     if ($LASTEXITCODE -ne 0) {
         Write-Host '[CAMARA][ERROR] Falló el render QooCam; no se crearán proxies con resultados incompletos.' -ForegroundColor Red
         exit $LASTEXITCODE

@@ -12,23 +12,23 @@ pushd "%~dp0" || (
 set "_DID_PUSHD=1"
 
 REM =================================================
-REM  QOOCAM Proxy Keeper v6
+REM  QOOCAM Proxy Keeper v7
 REM  - Proxy nuevo corto:   <BASE>_proxy.mp4
 REM  - Acepta proxy legado: <BASE>_proxy_1920x960_30fps.mp4
 REM  - Valida archivos existentes con ffprobe antes de reutilizarlos
 REM  - Archiva resultados incompletos/corruptos; nunca toca los originales
 REM =================================================
-set "SCRIPT_VER=QOOCAM Proxy Keeper v6 [validacion y recuperacion segura]"
+set "SCRIPT_VER=QOOCAM Proxy Keeper v7 [salida junto al original + legado KDOutput]"
 echo([INFO] %SCRIPT_VER%
 
 REM ==================== CONFIG ====================
-set "DIR_IN=KDOutput"
+set "DIR_IN=."
+set "DIR_IN_LEGACY=KDOutput"
 set "DIR_PROXY=Proxies"
 set "DIR_RIGHT=Right25"
 
 set "FILL_PROXIES=1"
 set "FILL_RIGHTS=1"
-set "RECURSIVE_IN=1"
 
 set "ORDER_BY=NAME"
 set "PAUSE_AT_END=0"
@@ -119,21 +119,18 @@ if "%USE_GPU%"=="1" (
   echo([INFO] Modo CPU: libx264
 )
 
-REM ====== LISTAR KDOutput ======
-set "SCAN_SWITCH="
-if "%RECURSIVE_IN%"=="1" set "SCAN_SWITCH=/s"
+REM ====== LISTAR RENDERS QOOCAM ======
+REM Nuevos: *_Output junto a los originales. Legado: KDOutput.
+REM Si existe el mismo nombre en ambos lugares, se prefiere el nuevo.
 del /q kd_list.txt 2>nul
-
-if exist "%DIR_IN%\" (
-  for %%E in (%EXTS%) do dir /a-d /b %SCAN_SWITCH% "%DIR_IN%\*.%%E" >> kd_list.txt 2>nul
-  for %%A in ("kd_list.txt") do if %%~zA gtr 0 (
-    echo([INFO] KDOutput detectado. Fuentes:
-    type kd_list.txt
-  ) else (
-    echo([WARN] KDOutput no tiene archivos con extensiones: %EXTS%
-  )
+type nul > kd_list.txt
+for %%E in (%EXTS%) do for %%F in ("*_Output.%%E") do if exist "%%~fF" echo %%~fF>>kd_list.txt
+if exist "%DIR_IN_LEGACY%\" for %%E in (%EXTS%) do for /r "%DIR_IN_LEGACY%" %%F in (*.%%E) do if not exist "%%~nxF" echo %%~fF>>kd_list.txt
+for %%A in ("kd_list.txt") do if %%~zA gtr 0 (
+  echo([INFO] Renders QooCam detectados:
+  type kd_list.txt
 ) else (
-  echo([WARN] "%DIR_IN%" no existe. Saltando creacion de proxies/right.
+  echo([WARN] No hay *_Output junto a los originales ni renders en KDOutput.
 )
 
 REM ====== PROCESAR: PROXY -> RIGHT ======

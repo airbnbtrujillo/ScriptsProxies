@@ -311,7 +311,7 @@ foreach ($proj in $projectFolders) {
     }
 
     # =====================================
-    # BLOQUE QOOCAM: originales -> KDOutput (QooCam) -> proxies.
+    # BLOQUE QOOCAM: originales -> *_Output junto al original -> proxies.
     # Ambos pasos conservan manifiestos/inventarios y omiten lo ya terminado.
     # =====================================
     if ($blockedQoo) {
@@ -321,7 +321,7 @@ foreach ($proj in $projectFolders) {
         $qooRenderCode = 0
         if ($QooRenderScriptSrc -and (Test-Path -LiteralPath $QooRenderScriptSrc -PathType Leaf)) {
             Write-Host ' [QOO] Verificando renders 180 3D Normal + Anti-Shake pendientes...'
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $QooRenderScriptSrc -SourceDir $qooDirPath -OutputDir (Join-Path $qooDirPath 'KDOutput')
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $QooRenderScriptSrc -SourceDir $qooDirPath
             $qooRenderCode = $LASTEXITCODE
             $ranQooRender = $true
         } else {
@@ -331,7 +331,7 @@ foreach ($proj in $projectFolders) {
 
         if ($qooRenderCode -eq 0) {
             if (Test-Path -LiteralPath $IntegrityScript -PathType Leaf) {
-                Write-Host ' [QOO] Validando cambios del KDOutput antes de crear proxies...'
+                Write-Host ' [QOO] Validando los renders junto a los originales antes de crear proxies...'
                 & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $IntegrityScript -ProjectPath $projPath -Repair
                 $qooIntegrityCode = $LASTEXITCODE
                 if ($qooIntegrityCode -ge 2 -or (Test-CameraIntegrityBlocked $projPath 'CAM-02')) {
@@ -342,7 +342,10 @@ foreach ($proj in $projectFolders) {
         }
 
         if ($qooRenderCode -eq 0) {
-            $qooRendered = @(Get-ChildItem -LiteralPath (Join-Path $qooDirPath 'KDOutput') -File -Filter '*.mp4' -ErrorAction SilentlyContinue)
+            $qooRendered = @(
+                Get-ChildItem -LiteralPath $qooDirPath -File -Filter '*_Output.mp4' -ErrorAction SilentlyContinue
+                Get-ChildItem -LiteralPath (Join-Path $qooDirPath 'KDOutput') -File -Filter '*.mp4' -ErrorAction SilentlyContinue
+            )
             if ($qooRendered.Count -gt 0 -and $QooProxyScriptSrc -and (Test-Path -LiteralPath $QooProxyScriptSrc)) {
                 $dstQooScript = Join-Path $qooDirPath (Split-Path $QooProxyScriptSrc -Leaf)
                 Write-Host " [QOO] Copiando script QOOCAM -> $dstQooScript"
@@ -358,7 +361,7 @@ foreach ($proj in $projectFolders) {
                     Write-Host " [QOO][ERROR] $($_.Exception.Message)"
                 }
             } elseif ($qooRendered.Count -eq 0) {
-                Write-Host ' [QOO] KDOutput todavía no contiene renders; no se ejecuta la etapa de proxies.' -ForegroundColor Yellow
+                Write-Host ' [QOO] Todavía no hay renders junto a los originales ni en KDOutput; no se ejecutan proxies.' -ForegroundColor Yellow
             } else {
                 Write-Host " [QOO][ADVERTENCIA] No encontré script QOOCAM en $ScriptsRoot"
             }

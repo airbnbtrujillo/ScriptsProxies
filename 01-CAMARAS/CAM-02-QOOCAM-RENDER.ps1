@@ -9,8 +9,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $source = (Get-Item -LiteralPath $SourceDir -ErrorAction Stop).FullName
-if (-not $OutputDir) { $OutputDir = Join-Path $source 'KDOutput' }
-$output = [IO.Path]::GetFullPath($OutputDir)
+if ($OutputDir -and [IO.Path]::GetFullPath($OutputDir) -ne $source) {
+    Write-Host '[QOO-RENDER][AVISO] OutputDir se ignora: QooCam guardara junto a los originales.' -ForegroundColor Yellow
+}
+$output = $source
 
 if (-not $AutomatorExe) {
     $AutomatorExe = Join-Path $RepoRoot 'tools\QooCamAutomation\QooCam_VR180_Batch_AntiShake.exe'
@@ -41,7 +43,7 @@ if (-not $QooCamExe) {
     }
 }
 
-$arguments = @('--source', $source, '--output', $output, '--direct', '--adopt-existing', '--run')
+$arguments = @('--source', $source, '--direct', '--adopt-existing', '--run')
 if (-not [string]::IsNullOrWhiteSpace($QooCamExe)) {
     if (-not (Test-Path -LiteralPath $QooCamExe -PathType Leaf)) {
         throw "QooCamStudioExe no existe: $QooCamExe"
@@ -49,7 +51,7 @@ if (-not [string]::IsNullOrWhiteSpace($QooCamExe)) {
     $arguments += @('--qoocam-exe', [IO.Path]::GetFullPath($QooCamExe))
 }
 
-Write-Host ("[QOO-RENDER] Originales directos: {0}. Salida: {1}" -f $originals.Count, $output) -ForegroundColor Cyan
+Write-Host ("[QOO-RENDER] Originales directos: {0}. Salida: misma carpeta de los originales ({1})" -f $originals.Count, $output) -ForegroundColor Cyan
 Write-Host '[QOO-RENDER] Durante la configuracion deja Windows desbloqueado y no uses el raton.' -ForegroundColor Yellow
 & $AutomatorExe @arguments
 $code = $LASTEXITCODE

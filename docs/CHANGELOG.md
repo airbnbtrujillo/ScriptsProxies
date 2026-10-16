@@ -1,5 +1,12 @@
 # Cambios
 
+## 2026.10.16.2
+
+- QooCam selecciona `Same directory as the source material`; cada `_Output.mp4` queda junto a su original.
+- El flujo de proxies reconoce la ubicación nueva y mantiene compatibilidad con el antiguo `KDOutput`.
+- Se documentan el aviso de reinicio y la variación `Feedback`: desmarcar `Send error report`, capturar el estado, pulsar `Send`, reiniciar y recuperar el proyecto.
+- El programa guarda capturas automáticas de reinicio, Feedback desmarcado y ajustes de exportación para adaptar otras computadoras.
+
 ## 2026.10.16.1
 
 - Se documentan con capturas reales 180 3D Normal, VR180, Anti-Shake, Export Settings y Export Completed.

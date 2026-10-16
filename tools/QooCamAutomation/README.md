@@ -1,6 +1,6 @@
 # Automatizador QooCam
 
-Esta carpeta contiene el **fuente** y el ejecutable que controla QooCam Studio para convertir los originales de `100QOOCAM` en renders VR180 dentro de `KDOutput`. El archivo que se ejecuta es `QooCam_VR180_Batch_AntiShake.exe`; el archivo que se debe leer o modificar es `qcam_batch_automator.py`.
+Esta carpeta contiene el **fuente** y el ejecutable que controla QooCam Studio para convertir los originales de `100QOOCAM` en renders VR180 junto a cada video original. El archivo que se ejecuta es `QooCam_VR180_Batch_AntiShake.exe`; el archivo que se debe leer o modificar es `qcam_batch_automator.py`.
 
 ## Mapa rápido del flujo
 
@@ -8,7 +8,7 @@ Esta carpeta contiene el **fuente** y el ejecutable que controla QooCam Studio p
 100QOOCAM (MP4 originales)
         │  lectura: nunca mueve ni borra originales
         ▼
-qcam_batch_automator.py ── controla QooCam Studio ──► KDOutput (MP4 8K VR180)
+qcam_batch_automator.py ── controla QooCam Studio ──► *_Output.mp4 junto al original
         │                                               │
         │ manifiesto: qcam_batch_manifest.json           ▼
         └── omite originales sin cambios          CAM-02-QOOCAM-PROXY.bat
@@ -22,14 +22,23 @@ Los ajustes de QooCam son fijos:
 - importacion `Single`
 - Anti-Shake para cada video
 - 7680x3840, MP4 H.265, bitrate High y audio estereo
+- ruta `Same directory as the source material`
 
 ## Cómo lee y decide qué procesar
 
 `discover_jobs()` es la función de entrada. Lee las carpetas indicadas y busca MP4; no modifica ningún original. Para evitar bucles, descarta automáticamente `KDOutput`, `Proxies`, `Right25`, `_HISTORICO`, el directorio temporal de pruebas y los nombres que ya parecen salida (`_Output`, `_Reframe` o `_Proxy`).
 
-Cada original se compara con `KDOutput/qcam_batch_manifest.json`, que guarda nombre, tamaño y fecha. Si el original no cambió y su salida ya pasa la validación (HEVC 7680x3840, duración y audio), se omite. Si falta, está dañada o el original cambió, se programa solo ese render.
+Cada original se compara con `100QOOCAM/qcam_batch_manifest.json`, que guarda nombre, tamaño y fecha. Si el original no cambió y su salida ya pasa la validación (HEVC 7680x3840, duración y audio), se omite. Si falta, está dañada o el original cambió, se programa solo ese render.
 
-El automatizador **no procesa proxies**: su única salida es el render 8K de QooCam en `KDOutput`. El BAT de cámara posterior crea los archivos ligeros para Premiere.
+El automatizador **no procesa proxies**: su única salida es el render 8K de QooCam junto al original. El BAT posterior reconoce esta ubicación nueva y también `KDOutput` para conservar compatibilidad con renders anteriores.
+
+## Reinicio y ventana Feedback
+
+Al cambiar a `180 3D Normal`, QooCam puede mostrar `Please restart QooCam Studio to complete the switch`. El automatizador guarda una captura, pulsa `OK`, vuelve a `File > Home` y abre el proyecto más reciente. No pierde los videos importados.
+
+En algunas computadoras QooCam se cierra durante esa configuración y al volver a abrir muestra `Feedback`. El automatizador busca exactamente una casilla `Send error report` y un botón `Send`: desmarca la casilla, comprueba que quedó desmarcada, guarda una captura y solo entonces pulsa `Send`. Después vuelve a iniciar QooCam y recupera el proyecto. Si los controles tienen otros nombres, se detiene sin enviar el reporte.
+
+Las referencias visuales están en `docs/QooCam-Evidence`, y las capturas nuevas de cada computadora quedan en `%LOCALAPPDATA%\QooCamBatchAntiShake\screenshots`.
 
 El orquestador lo llama automaticamente antes de `CAM-02-QOOCAM-PROXY.bat`. Durante la configuracion de QooCam, Windows debe estar desbloqueado y no se debe usar el raton. Cuando el indicador diga que el render ya comenzo, el automatizador deja de hacer clics.
 
