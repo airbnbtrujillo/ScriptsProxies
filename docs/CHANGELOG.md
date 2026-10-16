@@ -1,5 +1,9 @@
 # Cambios
 
+## 2026.10.16.3
+
+- Nueva herramienta independiente `TOOL-08-FFMPEG-PROXIES-UN-SEISMO`: crea proxies H.264/AAC a un sexto de ancho y alto para edición, revisión o transporte. Conserva nombre, extensión y estructura de carpetas, nunca modifica originales y reutiliza proxies ya válidos.
+
 ## 2026.10.16.2
 
 - QooCam selecciona `Same directory as the source material`; cada `_Output.mp4` queda junto a su original.

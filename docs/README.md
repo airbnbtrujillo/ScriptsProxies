@@ -32,6 +32,12 @@ Para una sola camara, selecciona la opcion 2 y pega la ruta exacta de su carpeta
 
 El modo de una sola camara copia unicamente el script seleccionado a la carpeta indicada y lo ejecuta ahi. No revisa ni procesa las demas camaras. Las rutas UNC y las unidades de red siguen admitidas mediante `pushd` y operaciones con rutas literales.
 
+## Proxy FFmpeg genérico a 1/6
+
+`03-HERRAMIENTAS\TOOL-08-FFMPEG-PROXIES-UN-SEISMO.bat` sirve para material que no pertenece a una cámara específica. Pide una carpeta de proyecto o `Videos`, lee los videos originales y crea `Videos\Proxies` conservando subcarpetas, nombre y extensión. Cada ancho y alto queda en un sexto (redondeado a un número par), sin cambiar FPS ni duración.
+
+Los archivos resultantes son H.264/AAC ligeros: se pueden usar para edición, revisión o transporte, sin depender de Premiere. El script nunca toca originales; los proxies dañados o de otra resolución se guardan en `Proxies\_HISTORICO\fecha_hora` antes de rehacerse.
+
 ## Flujo automatico QOOCAM
 
 Para cada proyecto con carpeta `100QOOCAM`, el procesamiento completo ahora ejecuta una sola cadena:
