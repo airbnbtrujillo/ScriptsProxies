@@ -28,6 +28,8 @@ Los ajustes de QooCam son fijos:
 
 `discover_jobs()` es la función de entrada. Lee las carpetas indicadas y busca MP4; no modifica ningún original. Para evitar bucles, descarta automáticamente `KDOutput`, `Proxies`, `Right25`, `_HISTORICO`, el directorio temporal de pruebas y los nombres que ya parecen salida (`_Output`, `_Reframe` o `_Proxy`).
 
+El nombre `QooCam_180_3D_Normal_AntiShake_HQ` no es un destino de QooCam. Fue usado únicamente por la versión 1.8 del automatizador y ahora se reconoce solo como ubicación heredada. Los archivos nuevos conservan el nombre automático de QooCam (`<original>_Output.mp4`) y quedan junto al original.
+
 Cada original se compara con `100QOOCAM/qcam_batch_manifest.json`, que guarda nombre, tamaño y fecha. Si el original no cambió y su salida ya pasa la validación (HEVC 7680x3840, duración y audio), se omite. Si falta, está dañada o el original cambió, se programa solo ese render.
 
 El automatizador **no procesa proxies**: su única salida es el render 8K de QooCam junto al original. El BAT posterior reconoce esta ubicación nueva y también `KDOutput` para conservar compatibilidad con renders anteriores.

@@ -67,12 +67,12 @@ from pywinauto.timings import TimeoutError as PwaTimeoutError
 
 
 APP_NAME = "QooCam VR180 Batch AntiShake"
-APP_VERSION = "1.9.0"
+APP_VERSION = "1.9.1"
 QOOCAM_EXE: Path | None = None
 DEFAULT_SOURCE = Path(r"G:\243 - Ari Cumback\100QOOCAM")
-DEFAULT_OUTPUT_NAME = "QooCam_180_3D_Normal_AntiShake_HQ"
+LEGACY_OUTPUT_DIR_NAMES = {"QooCam_180_3D_Normal_AntiShake_HQ"}
 IGNORED_SOURCE_DIRS = {
-    DEFAULT_OUTPUT_NAME.casefold(),
+    *(name.casefold() for name in LEGACY_OUTPUT_DIR_NAMES),
     "QooCamAutomation_Test".casefold(),
     "KDOutput".casefold(),
     "Proxies".casefold(),

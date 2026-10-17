@@ -1,5 +1,11 @@
 # Cambios
 
+## 2026.10.17.1
+
+- Se elimina `QooCam_180_3D_Normal_AntiShake_HQ` como nombre de destino activo.
+- QooCam conserva su nombre automático `<original>_Output.mp4` junto al video original.
+- El proxy todavía reconoce la carpeta incorrecta de la versión 1.8 únicamente para recuperar renders ya existentes.
+
 ## 2026.10.16.5
 
 - TOOL-08 acepta el 1/6 con orientación intercambiada cuando FFmpeg aplica la metadata de rotación del original; así los videos verticales marcados dentro de un fotograma horizontal no se rechazan por error.

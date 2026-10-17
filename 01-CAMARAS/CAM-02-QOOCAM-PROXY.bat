@@ -120,17 +120,19 @@ if "%USE_GPU%"=="1" (
 )
 
 REM ====== LISTAR RENDERS QOOCAM ======
-REM Nuevos: *_Output junto a los originales. Legado: KDOutput.
-REM Si existe el mismo nombre en ambos lugares, se prefiere el nuevo.
+REM Actual: QooCam conserva su nombre automatico *_Output junto al original.
+REM Legado: KDOutput y la carpeta erronea creada por el automatizador v1.8.
+REM Si existe el mismo nombre en varios lugares, se prefiere el actual.
 del /q kd_list.txt 2>nul
 type nul > kd_list.txt
-for %%E in (%EXTS%) do for %%F in ("*_Output.%%E") do if exist "%%~fF" echo %%~fF>>kd_list.txt
+for %%E in (%EXTS%) do for %%F in ("*_Output*.%%E") do if exist "%%~fF" echo %%~fF>>kd_list.txt
 if exist "%DIR_IN_LEGACY%\" for %%E in (%EXTS%) do for /r "%DIR_IN_LEGACY%" %%F in (*.%%E) do if not exist "%%~nxF" echo %%~fF>>kd_list.txt
+if exist "QooCam_180_3D_Normal_AntiShake_HQ\" for %%E in (%EXTS%) do for /r "QooCam_180_3D_Normal_AntiShake_HQ" %%F in (*_Output*.%%E) do if not exist "%%~nxF" echo %%~fF>>kd_list.txt
 for %%A in ("kd_list.txt") do if %%~zA gtr 0 (
   echo([INFO] Renders QooCam detectados:
   type kd_list.txt
 ) else (
-  echo([WARN] No hay *_Output junto a los originales ni renders en KDOutput.
+  echo([WARN] No hay renders QooCam con su nombre automatico *_Output.
 )
 
 REM ====== PROCESAR: PROXY -> RIGHT ======
