@@ -43,10 +43,10 @@ Los archivos resultantes son H.264/AAC ligeros: se pueden usar para edición, re
 Para cada proyecto con carpeta `100QOOCAM`, el procesamiento completo ahora ejecuta una sola cadena:
 
 1. Busca todos los MP4 originales que estan directamente dentro de `100QOOCAM`.
-2. Renderiza solamente los faltantes o modificados junto a sus originales usando `180 3D Normal`, importacion Single, Anti-Shake, 7680x3840, H.265 y bitrate High.
-3. Ejecuta el flujo de proxies sobre los nuevos `*_Output.mp4`; también acepta el antiguo `KDOutput` para conservar compatibilidad.
+2. Renderiza solamente los faltantes o modificados dentro de `KDOutput` usando `180 3D Normal`, importacion Single, Anti-Shake, 7680x3840, H.265 y bitrate High.
+3. Ejecuta el flujo de proxies sobre los nuevos `KDOutput\*_Output.mp4`; también acepta ubicaciones heredadas para no perder renders anteriores.
 
-Los directorios `KDOutput`, `Proxies`, `Right25` y `_HISTORICO` nunca se vuelven a tomar como originales. El manifiesto `100QOOCAM\qcam_batch_manifest.json` guarda la huella de cada original y permite continuar despues de una interrupcion sin volver a renderizar lo ya verificado.
+Los directorios `KDOutput`, `Proxies`, `Right25` y `_HISTORICO` nunca se vuelven a tomar como originales. El manifiesto `100QOOCAM\KDOutput\qcam_batch_manifest.json` guarda la huella de cada original y permite continuar despues de una interrupcion sin volver a renderizar lo ya verificado.
 
 Si un original previamente procesado cambia conservando el mismo nombre, el render anterior se mueve de forma recuperable a `100QOOCAM\_HISTORICO`, se genera de nuevo y la comprobacion de integridad aparta sus proxies derivados antes de reconstruirlos. Una salida que ya existe pero nunca fue registrada no se sobrescribe automaticamente.
 

@@ -18,7 +18,8 @@ class BatchInputsTests(unittest.TestCase):
         self.source.mkdir(parents=True)
         self.video = self.source / "Q360_20260902_180032_000002.MP4"
         self.video.write_bytes(b"original")
-        self.output = self.source
+        self.output = self.source / "KDOutput"
+        self.output.mkdir()
 
     def test_recursive_overlapping_inputs_are_deduplicated(self):
         jobs = discover_jobs([self.root, self.source])
@@ -41,20 +42,20 @@ class BatchInputsTests(unittest.TestCase):
         other = self.root / 'renamed'
         other.mkdir()
         (other / 'Cooking original.mp4').write_bytes(b'original')
-        self.assertIn((other, other),
+        self.assertIn((other, other / "KDOutput"),
                       discover_jobs([self.root]))
 
     def test_direct_mode_ignores_kdoutput_and_nested_videos(self):
         kdoutput = self.source / 'KDOutput'
-        kdoutput.mkdir()
+        kdoutput.mkdir(exist_ok=True)
         (kdoutput / 'Already rendered.mp4').write_bytes(b'rendered')
         nested = self.source / 'nested'
         nested.mkdir()
         (nested / 'Other original.mp4').write_bytes(b'other')
         self.assertEqual(discover_jobs([self.source], recursive=False),
-                         [(self.source, self.source)])
-        with self.assertRaises(AutomationError):
-            discover_jobs([self.source], kdoutput, recursive=False)
+                         [(self.source, kdoutput)])
+        self.assertEqual(discover_jobs([self.source], kdoutput, recursive=False),
+                         [(self.source, kdoutput)])
         recursive_sources = [source for source, _ in discover_jobs([self.source])]
         self.assertNotIn(kdoutput, recursive_sources)
         self.assertIn(nested, recursive_sources)
@@ -92,6 +93,18 @@ class BatchInputsTests(unittest.TestCase):
         record["settings"] = dict(EXPORT_SETTINGS)
         result.write_bytes(b"truncated")
         self.assertFalse(is_completed(group, self.output, manifest))
+
+    def test_completed_accepts_verified_manifest_from_before_path_setting(self):
+        group = scan_recordings(self.source)[0]
+        result = self.output / group.expected_output_name
+        result.write_bytes(b"0" * 1_000_001)
+        legacy_settings = dict(EXPORT_SETTINGS)
+        legacy_settings.pop("output_path")
+        manifest = {"completed": {group.key: {
+            "sources": group.signature(), "output": result.name,
+            "output_size": result.stat().st_size, "settings": legacy_settings,
+        }}}
+        self.assertTrue(is_completed(group, self.output, manifest))
 
     def test_changed_verified_output_is_archivable_not_unverified_conflict(self):
         group = scan_recordings(self.source)[0]

@@ -311,7 +311,7 @@ foreach ($proj in $projectFolders) {
     }
 
     # =====================================
-    # BLOQUE QOOCAM: originales -> *_Output junto al original -> proxies.
+    # BLOQUE QOOCAM: originales -> KDOutput\*_Output -> proxies.
     # Ambos pasos conservan manifiestos/inventarios y omiten lo ya terminado.
     # =====================================
     if ($blockedQoo) {
@@ -361,7 +361,7 @@ foreach ($proj in $projectFolders) {
                     Write-Host " [QOO][ERROR] $($_.Exception.Message)"
                 }
             } elseif ($qooRendered.Count -eq 0) {
-                Write-Host ' [QOO] Todavía no hay renders junto a los originales ni en KDOutput; no se ejecutan proxies.' -ForegroundColor Yellow
+                Write-Host ' [QOO] Todavía no hay renders en KDOutput; no se ejecutan proxies.' -ForegroundColor Yellow
             } else {
                 Write-Host " [QOO][ADVERTENCIA] No encontré script QOOCAM en $ScriptsRoot"
             }

@@ -1,5 +1,11 @@
 # Cambios
 
+## 2026.10.17.2
+
+- Corrección de destino QooCam: la carpeta obligatoria es `KDOutput`, no `QooCam_180_3D_Normal_AntiShake_HQ` ni la carpeta raíz de los originales.
+- Export Settings vuelve a usar `Specified Directory` y verifica que apunte al `KDOutput` correspondiente.
+- Se conserva el nombre automático `<original>_Output.mp4` que asigna QooCam.
+
 ## 2026.10.17.1
 
 - Se elimina `QooCam_180_3D_Normal_AntiShake_HQ` como nombre de destino activo.

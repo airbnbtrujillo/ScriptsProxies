@@ -12,7 +12,7 @@ Evidencia obtenida durante pruebas reales del ejecutable entre el 27 y el 29 de 
 | Formato | `MP4(H265)` | Se vuelve a leer antes de Export. |
 | Bitrate | `High` | Se vuelve a leer antes de Export. |
 | Audio | `Stereo Audio` | Se vuelve a leer antes de Export. |
-| Salida | `Same directory as the source material` | El `_Output.mp4` queda junto al original. |
+| Salida | `Specified Directory` | Apunta a `100QOOCAM\KDOutput`. |
 
 ## 1. Modo 180 3D Normal
 
@@ -34,13 +34,13 @@ El panel `Stabilization` muestra **Anti-shake** seleccionado. Los videos aparece
 
 ## 4. Ajustes de calidad comprobados anteriormente
 
-La captura histórica confirma `7680x3840`, `MP4(H265)`, bitrate `High` y `Stereo Audio`. La ruta `Specified Directory` que aparece en esta evidencia fue reemplazada en la versión 1.9.0 por `Same directory as the source material`.
+La captura confirma `7680x3840`, `MP4(H265)`, bitrate `High`, `Stereo Audio` y `Specified Directory`. El directorio seleccionado debe ser exactamente la subcarpeta `KDOutput` de la entrada.
 
 ![Export Settings](QooCam-Evidence/04-Export-Settings.png)
 
-## 5. Ruta nueva: misma carpeta del original
+## 5. Ruta correcta: KDOutput
 
-La opcion obligatoria actual es **Same directory as the source material**. Aunque la captura de referencia muestre bitrate `Standard`, el automatizador selecciona y vuelve a comprobar `High` antes de exportar.
+La opción obligatoria es **Specified Directory**, seleccionando `100QOOCAM\KDOutput`. Aunque la captura siguiente muestre la alternativa `Same directory as the source material` y bitrate `Standard`, solamente sirve para identificar el desplegable; el automatizador elige `Specified Directory` y vuelve a comprobar `High` antes de exportar.
 
 ![Same directory as the source material](QooCam-Evidence/06-Same-directory-source.png)
 
