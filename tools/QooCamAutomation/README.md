@@ -81,6 +81,27 @@ Las correcciones de interfaz específicas de otra PC se realizan en `qcam_batch_
 
 Antes de recompilar, ejecuta `python -m unittest test_batch_inputs.py`. Para generar el ejecutable, instala las dependencias del fuente y ejecuta `pyinstaller --noconfirm --clean QooCam_VR180_Batch_AntiShake.spec` dentro de esta carpeta.
 
+## Qué falta renderizar (desde la versión 1.11.0)
+
+Antes de abrir QooCam, el automatizador mide con `ffprobe` cada original y su render en `KDOutput` y clasifica:
+
+- `COMPLETO`: el render dura lo mismo que el original (QooCam agrega menos de un segundo). No se toca.
+- `UNIDO` / `CUBIERTO`: un render hecho con importación Merge dura lo que varios segmentos juntos (`_000001` + `_000002`...) y cubre a todos. No se duplica.
+- `INCOMPLETO` / `DANADO`: el render dura menos o no se puede abrir, aunque tenga el mismo nombre. Se aparta a `_HISTORICO` (nunca se borra) y se vuelve a renderizar.
+- `CAMBIADO`: el original cambió después de su render registrado en el manifiesto. Se rehace.
+- `ORIG.DANADO`: el original no se puede leer o dura menos de medio segundo. Se omite y se avisa.
+- `FALTA`: no tiene render.
+
+Si lo pendiente no cabe en el disco (unos 20 MB por segundo de video 8K), se detiene antes de abrir QooCam.
+
+Para ver el informe de una carpeta sin renderizar nada, desde el fuente:
+
+```powershell
+python qcam_batch_automator.py --informe --direct --source "<carpeta>@QOOCAM"
+```
+
+El `.exe` acepta la misma opción, pero al no tener consola no muestra el texto; usa el fuente o `--analyze` desde el orquestador.
+
 ## Instrucción breve para otro agente
 
 > Lee primero este README y el comentario inicial de `qcam_batch_automator.py`. No supongas que los MP4 dentro de `KDOutput`, `Proxies` o `Right25` son originales. Antes de cambiar la automatización por una pantalla diferente, revisa `automator.log` y las capturas guardadas. Conserva la estrategia de localizar controles y calcular clics desde sus rectángulos: no sustituyas eso por coordenadas fijas.

@@ -22,6 +22,7 @@ Adaptacion a otra computadora:
 from __future__ import annotations
 
 import argparse
+import collections
 import ctypes
 import json
 import logging
@@ -67,7 +68,7 @@ from pywinauto.timings import TimeoutError as PwaTimeoutError
 
 
 APP_NAME = "QooCam VR180 Batch AntiShake"
-APP_VERSION = "1.10.0"
+APP_VERSION = "1.11.0"
 QOOCAM_EXE: Path | None = None
 DEFAULT_SOURCE = Path(r"G:\243 - Ari Cumback\100QOOCAM")
 OUTPUT_DIR_NAME = "KDOutput"
@@ -241,16 +242,18 @@ def discover_jobs(
 
 
 def job_report(source: Path, output: Path) -> dict:
-    manifest = read_manifest(output)
     groups = scan_recordings(source)
+    checks = assess_renders(source, output, groups)
     return {
         "source": str(source), "output": str(output),
         "groups": [{"key": group.key,
                     "files": [str(path) for path in group.files],
                     "expected_output": group.expected_output_name,
-                    "state": "completed" if is_completed(group, output, manifest)
-                    else "existing_unverified" if (output / group.expected_output_name).exists()
-                    else "pending"} for group in groups],
+                    "state": "completed" if checks[group.key].state in DONE_STATES
+                    else "pending" if checks[group.key].state in REDO_STATES
+                    else "skipped",
+                    "estado": checks[group.key].state,
+                    "motivo": checks[group.key].reason} for group in groups],
     }
 
 
@@ -306,6 +309,146 @@ def validate_existing_render(path: Path) -> bool:
         )
     except (KeyError, StopIteration, TypeError, ValueError, json.JSONDecodeError):
         return False
+
+
+# Medido en renders reales de QooCam (8K H.265 bitrate High): unos 20 MB por segundo.
+RENDER_BYTES_PER_SECOND = 21 * 2 ** 20
+SEGMENT_RE = re.compile(r"^(?P<prefix>.+_)(?P<part>\d{6})$")
+DONE_STATES = {"completo", "unido", "cubierto"}
+REDO_STATES = {"falta", "incompleto", "danado", "cambiado"}
+STATE_LABELS = {
+    "completo": "COMPLETO", "unido": "UNIDO", "cubierto": "CUBIERTO", "falta": "FALTA",
+    "incompleto": "INCOMPLETO", "danado": "DANADO", "original_danado": "ORIG.DANADO", "revisar": "REVISAR", "cambiado": "CAMBIADO",
+}
+
+
+@dataclass
+class RenderCheck:
+    state: str
+    reason: str
+    source_seconds: float = 0.0
+
+
+def media_duration(path: Path) -> float | None:
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe or not path.is_file():
+        return None
+    result = subprocess.run(
+        [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, encoding="utf-8", errors="ignore",
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), check=False,
+    )
+    try:
+        return float(result.stdout.strip()) if result.returncode == 0 else None
+    except ValueError:
+        return None
+
+
+def duration_matches(actual: float, expected: float) -> bool:
+    # QooCam suele agregar menos de un segundo al final.
+    return abs(actual - expected) <= max(2.0, expected * 0.01)
+
+
+def assess_renders(source: Path, output: Path, groups=None) -> dict[str, RenderCheck]:
+    """Clasificar cada original segun su render, midiendo duraciones con ffprobe.
+
+    Un render con el mismo nombre no basta: si se corto, no se puede leer o dura
+    menos que el original. Un render de una grabacion partida (Merge) dura lo que
+    sus segmentos juntos y cubre tambien a los siguientes.
+    """
+    groups = list(groups if groups is not None else scan_recordings(source))
+    manifest = read_manifest(output)
+    records = manifest.get("completed", {})
+    checks: dict[str, RenderCheck] = {}
+    # El registro de renders ya verificados evita medir otra vez lo que no cambio.
+    for group in groups:
+        record = records.get(group.key)
+        if is_completed(group, output, manifest):
+            checks[group.key] = RenderCheck("completo", "verificado y registrado en un render anterior")
+        elif record and record.get("sources") != group.signature():
+            checks[group.key] = RenderCheck("cambiado", "el original cambio desde que se renderizo")
+    durations = {g.key: media_duration(g.representative) for g in groups if g.key not in checks}
+    for key in [k for k, c in checks.items() if c.state == "cambiado"]:
+        group = next(g for g in groups if g.key == key)
+        checks[key].source_seconds = media_duration(group.representative) or 0.0
+    covered: dict[str, str] = {}
+    for index, group in enumerate(groups):
+        if group.key in covered or group.key in checks:
+            continue
+        src = durations[group.key]
+        if not src or src < 0.5:
+            checks[group.key] = RenderCheck(
+                "original_danado",
+                "el original no se puede leer o dura menos de medio segundo; QooCam no podria procesarlo")
+            continue
+        out = output / group.expected_output_name
+        if not out.exists():
+            continue
+        if not validate_existing_render(out):
+            checks[group.key] = RenderCheck(
+                "danado", "el render existe pero no se puede leer o no es H.265 7680x3840 (se corto)", src)
+            continue
+        got = media_duration(out) or 0.0
+        if duration_matches(got, src):
+            checks[group.key] = RenderCheck("completo", f"{got:.0f} s, igual que el original", src)
+            continue
+        match, total, joined = SEGMENT_RE.match(group.key), src, []
+        for later in groups[index + 1:]:
+            other = SEGMENT_RE.match(later.key)
+            if not match or not other or other["prefix"] != match["prefix"] or not durations.get(later.key):
+                break
+            total += durations[later.key]
+            joined.append(later.key)
+            if duration_matches(got, total):
+                break
+        if joined and duration_matches(got, total):
+            checks[group.key] = RenderCheck(
+                "unido", f"{got:.0f} s: tambien contiene {', '.join(joined)} (importacion Merge)", src)
+            covered.update({key: out.name for key in joined})
+        elif got < src:
+            checks[group.key] = RenderCheck(
+                "incompleto", f"el render dura {got:.0f} s y el original {src:.0f} s", src)
+        else:
+            checks[group.key] = RenderCheck(
+                "revisar", f"el render dura {got:.0f} s, mas que el original ({src:.0f} s); no se toca", src)
+    for group in groups:
+        if group.key in checks:
+            continue
+        if group.key in covered:
+            checks[group.key] = RenderCheck("cubierto", f"incluido en {covered[group.key]}", durations[group.key] or 0.0)
+        else:
+            checks[group.key] = RenderCheck("falta", "no tiene render", durations[group.key] or 0.0)
+    return checks
+
+
+def check_render_space(output: Path, seconds: float) -> None:
+    need = seconds * RENDER_BYTES_PER_SECOND * 1.1
+    probe_dir = output if output.exists() else output.parent
+    free = shutil.disk_usage(probe_dir).free
+    if free < need:
+        raise AutomationError(
+            f"No hay espacio para renderizar: hacen falta unos {need / 2 ** 30:,.1f} GB en "
+            f"{probe_dir.anchor} y quedan {free / 2 ** 30:,.1f} GB."
+        )
+
+
+def print_report(jobs) -> None:
+    for source, output in jobs:
+        checks = assess_renders(source, output)
+        print(f"\n{source}")
+        for key, check in checks.items():
+            print(f"  {STATE_LABELS[check.state]:12} {key}   {check.reason}")
+        counts = collections.Counter(check.state for check in checks.values())
+        todo = [check for check in checks.values() if check.state in REDO_STATES]
+        seconds = sum(check.source_seconds for check in todo)
+        print("  " + ", ".join(f"{STATE_LABELS[k]} {v}" for k, v in counts.most_common()))
+        if todo:
+            free = shutil.disk_usage(output if output.exists() else output.parent).free
+            print(f"  Por renderizar: {len(todo)} ({seconds / 60:.1f} min de video, unos "
+                  f"{seconds * RENDER_BYTES_PER_SECOND * 1.1 / 2 ** 30:,.1f} GB; libres "
+                  f"{free / 2 ** 30:,.1f} GB)")
+        else:
+            print("  Nada por renderizar.")
 
 
 def adopt_existing_outputs(jobs) -> int:
@@ -616,25 +759,16 @@ class QooCamAutomator:
         self.antishake_verified = ()
         self.groups = scan_recordings(source)
         self.manifest = read_manifest(output)
-        self.pending = [
-            group for group in self.groups if not is_completed(group, output, self.manifest)
-        ]
-        completed_records = self.manifest.get("completed", {})
+        # Antes de abrir QooCam: medir que render ya esta completo y cual falta,
+        # esta incompleto o danado. Solo esos ultimos se vuelven a renderizar.
+        self.checks = assess_renders(source, output, self.groups)
+        self.pending = [g for g in self.groups if self.checks[g.key].state in REDO_STATES]
+        self.skipped = [g for g in self.groups if self.checks[g.key].state not in REDO_STATES | DONE_STATES]
+        # Un render incompleto o danado se aparta (nunca se borra) para que QooCam
+        # pueda escribir el nuevo con el mismo nombre.
         self.stale_outputs = [
-            group for group in self.pending
-            if (output / group.expected_output_name).exists()
-            and group.key in completed_records
+            group for group in self.pending if (output / group.expected_output_name).exists()
         ]
-        conflicts = [
-            group.expected_output_name for group in self.pending
-            if (output / group.expected_output_name).exists()
-            and group.key not in completed_records
-        ]
-        if conflicts:
-            raise AutomationError(
-                "Hay salidas existentes sin verificación de estos ajustes; no se "
-                "sobrescribirán: " + ", ".join(conflicts)
-            )
 
     def run(self) -> None:
         global QOOCAM_EXE
@@ -655,13 +789,17 @@ class QooCamAutomator:
                 completed.pop(group.key, None)
             write_manifest(self.output, self.manifest)
             self.status(
-                f"Se archivaron {len(self.stale_outputs)} render(s) anteriores porque "
-                "el original o la configuración cambió."
+                f"Se apartaron a _HISTORICO {len(self.stale_outputs)} render(s) "
+                "incompletos o danados para rehacerlos."
             )
 
+        for group in self.skipped:
+            check = self.checks[group.key]
+            self.status(f"Se omite {group.key}: {check.reason}.")
         if not self.pending:
             self.status("Todo ya estaba procesado; no hay trabajos pendientes.")
             return
+        check_render_space(self.output, sum(self.checks[g.key].source_seconds for g in self.pending))
         if QOOCAM_EXE is None:
             QOOCAM_EXE = find_qoocam_exe()
         if not QOOCAM_EXE.is_file():
@@ -1798,9 +1936,11 @@ def parse_args(argv: Iterable[str] | None = None):
     )
     parser.add_argument("--autostart", action="store_true")
     parser.add_argument("--analyze", action="store_true")
+    parser.add_argument("--informe", action="store_true",
+                        help="Lista legible: que esta completo, que falta y por que; no abre QooCam")
     parser.add_argument("--run", action="store_true", help="Procesar sin interfaz para un integrador")
     args = parser.parse_args(argv)
-    if (args.analyze or args.run or args.autostart) and not args.source:
+    if (args.analyze or args.informe or args.run or args.autostart) and not args.source:
         parser.error("Especifica al menos una carpeta con --source")
     return args
 
@@ -1813,7 +1953,10 @@ def main() -> int:
     sources = args.source or [DEFAULT_SOURCE]
     jobs = discover_jobs(
         sources, args.output, recursive=not args.direct
-    ) if args.analyze or args.run else []
+    ) if args.analyze or args.informe or args.run else []
+    if args.informe:
+        print_report(jobs)
+        return 0
     if args.analyze:
         print(
             json.dumps(

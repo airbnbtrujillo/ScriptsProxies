@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from qcam_batch_automator import (
-    AutomationError, EXPORT_SETTINGS, QooCamAutomator, adopt_existing_outputs, discover_jobs,
+    AutomationError, EXPORT_SETTINGS, QooCamAutomator, adopt_existing_outputs, assess_renders, discover_jobs,
     is_completed, job_report, parse_args, scan_recordings, write_manifest,
 )
 
@@ -70,13 +70,36 @@ class BatchInputsTests(unittest.TestCase):
         with self.assertRaises(AutomationError):
             discover_jobs([self.root], self.root / "shared")
 
-    def test_existing_unverified_is_not_overwritten(self):
+    def test_damaged_output_with_same_name_is_redone_without_deleting(self):
         group = scan_recordings(self.source)[0]
         (self.output / group.expected_output_name).write_bytes(b"incomplete")
-        self.assertEqual(job_report(self.source, self.output)["groups"][0]["state"],
-                         "existing_unverified")
-        with self.assertRaises(AutomationError):
-            QooCamAutomator(self.source, self.output, lambda _: None, threading.Event())
+        with patch("qcam_batch_automator.media_duration", return_value=30.0),                 patch("qcam_batch_automator.validate_existing_render", return_value=False):
+            report = job_report(self.source, self.output)["groups"][0]
+            self.assertEqual((report["state"], report["estado"]), ("pending", "danado"))
+            automator = QooCamAutomator(self.source, self.output, lambda _: None, threading.Event())
+        # Se aparta a _HISTORICO antes de renderizar; nunca se sobrescribe ni se borra.
+        self.assertEqual(automator.stale_outputs, [group])
+
+    def test_short_render_is_incomplete_and_matching_render_is_complete(self):
+        group = scan_recordings(self.source)[0]
+        result = self.output / group.expected_output_name
+        result.write_bytes(b"0" * 1_000_001)
+        durations = {self.video: 120.0, result: 45.0}
+        with patch("qcam_batch_automator.media_duration", side_effect=lambda p: durations[p]),                 patch("qcam_batch_automator.validate_existing_render", return_value=True):
+            self.assertEqual(assess_renders(self.source, self.output)[group.key].state, "incompleto")
+            durations[result] = 120.6
+            self.assertEqual(assess_renders(self.source, self.output)[group.key].state, "completo")
+
+    def test_merged_render_covers_next_segment(self):
+        first = self.source / "Q360_20260902_180032_000001.MP4"
+        first.write_bytes(b"first segment")
+        merged = self.output / "Q360_20260902_180032_000001_Output.mp4"
+        merged.write_bytes(b"0" * 1_000_001)
+        durations = {first: 600.0, self.video: 22.0, merged: 623.2}
+        with patch("qcam_batch_automator.media_duration", side_effect=lambda p: durations[p]),                 patch("qcam_batch_automator.validate_existing_render", return_value=True):
+            checks = assess_renders(self.source, self.output)
+        self.assertEqual(checks["Q360_20260902_180032_000001"].state, "unido")
+        self.assertEqual(checks["Q360_20260902_180032_000002"].state, "cubierto")
 
     def test_completed_requires_same_settings_and_file_size(self):
         group = scan_recordings(self.source)[0]
