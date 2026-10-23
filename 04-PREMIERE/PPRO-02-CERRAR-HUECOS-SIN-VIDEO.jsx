@@ -1,10 +1,12 @@
 /*
-CERRAR HUECOS SIN VIDEO - V2 (revision 4)
+CERRAR HUECOS SIN VIDEO - V2 (revision 5)
 En cada tramo de la secuencia activa donde no hay video en ninguna pista, marca
 entrada y salida y le pide a Premiere que lo EXTRAIGA. Premiere cierra el hueco
 en todas las pistas a la vez, tambien las de subtitulos, que un script no puede
 tocar directamente.
-Los cierra todos de una vez, del ultimo al primero, sin preguntar. Antes de cada
+Los cierra todos de una vez, del ultimo al primero, sin preguntar. Cuando un
+hueco separaba dos clips en una misma pista de video, agrega Cross Dissolve en
+esa union. Antes de cada
 extraccion calcula como debe quedar cada clip de video y audio, y despues lo
 compara con la secuencia real; si no coincide, deshace ese paso y se detiene.
 Ejecutar sobre una COPIA de la secuencia.
@@ -16,7 +18,7 @@ Ejecutar sobre una COPIA de la secuencia.
     // un tick ANTES del fotograma hace que el video se corte un fotograma entero antes,
     // asi que a cada marca se le suma la fraccion de tick que la deja exacta.
     var MARGINS = [0, 0.5, 0.25, 0.75, 1, 2];
-    var log = ["CERRAR HUECOS SIN VIDEO V2 (revision 4)"];
+    var log = ["CERRAR HUECOS SIN VIDEO V2 (revision 5 · Cross Dissolve)"];
     function fail(s) { throw new Error(s); }
     function report(message) {
         log.push(message);
@@ -53,7 +55,7 @@ Ejecutar sobre una COPIA de la secuencia.
         // Posicion real de cada clip, por pista, y tramos sin video.
         function snapshot() {
             if (String(app.project.activeSequence.sequenceID) !== String(seq.sequenceID)) fail("Cambio la secuencia activa.");
-            var tracks = [], video = [], end = 0, groups = [["V", seq.videoTracks], ["A", seq.audioTracks]], g, t, i;
+            var tracks = [], video = [], videoTracks = [], end = 0, groups = [["V", seq.videoTracks], ["A", seq.audioTracks]], g, t, i;
             for (g = 0; g < groups.length; g++) for (t = 0; t < groups[g][1].numTracks; t++) {
                 var list = [], clips = groups[g][1][t].clips;
                 for (i = 0; i < clips.numItems; i++) {
@@ -64,6 +66,7 @@ Ejecutar sobre una COPIA de la secuencia.
                     end = Math.max(end, e);
                 }
                 list.sort(byStart);
+                if (g === 0) videoTracks.push(list);
                 tracks.push({name: groups[g][0] + (t + 1), clips: list});
             }
             video.sort(byStart);
@@ -75,7 +78,7 @@ Ejecutar sobre una COPIA de la secuencia.
             }
             // La cola se quita entera aunque el audio termine a mitad de un fotograma.
             if (end - cursor > 0.5) gaps.push({s: Math.round(cursor), e: Math.ceil(end - TOL)});
-            return {tracks: tracks, gaps: gaps, end: end, videoClips: video.length};
+            return {tracks: tracks, gaps: gaps, end: end, videoClips: video.length, videoTracks: videoTracks};
         }
         function lists(snap) {
             var out = [];
@@ -140,6 +143,38 @@ Ejecutar sobre una COPIA de la secuencia.
             if (!(dIn >= 0 && dIn < limit && dOut >= 0 && dOut < limit))
                 fail("Premiere no dejo la entrada y la salida en los fotogramas pedidos (" + timecode(gap.s) + " a " + timecode(gap.e) + "). No se extrajo ese tramo.");
         }
+        // Solo se aplica donde habia un clip que terminaba en el borde izquierdo
+        // Y otro que empezaba en el borde derecho del hueco original. Un video que
+        // aparecio o termino en ese punto no recibe una transicion inventada.
+        function addCrossDissolves(before, gap) {
+            var transition, added = 0, t, i, left, right, clips, qtrack, qclip;
+            try { transition = qe.project.getVideoTransitionByName("Cross Dissolve"); }
+            catch (transitionError) { log.push("  No se pudo localizar Cross Dissolve: " + transitionError); return 0; }
+            if (!transition) { log.push("  No se encontro Cross Dissolve en esta instalacion; el hueco se cerro sin transicion."); return 0; }
+            for (t = 0; t < before.videoTracks.length; t++) {
+                left = right = false;
+                for (i = 0; i < before.videoTracks[t].length; i++) {
+                    if (Math.abs(before.videoTracks[t][i].e - gap.s) <= TOL) left = true;
+                    if (Math.abs(before.videoTracks[t][i].s - gap.e) <= TOL) right = true;
+                }
+                if (!left || !right) continue;
+                clips = seq.videoTracks[t].clips;
+                for (i = 0; i < clips.numItems; i++) {
+                    if (Math.abs(Number(clips[i].start.ticks) / frameTicks - gap.s) > TOL) continue;
+                    try {
+                        qtrack = qseq.getVideoTrackAt(t);
+                        qclip = qtrack && qtrack.getItemAt(i);
+                        if (!qclip || typeof qclip.addTransition !== "function") throw new Error("Premiere no expone addTransition en V" + (t + 1));
+                        // En el inicio del clip entrante; 1 segundo de duracion, centrado en el corte.
+                        qclip.addTransition(transition, true, "00:00:01:00", "00:00:00:00", 0.5);
+                        added++;
+                        log.push("  Cross Dissolve agregado en V" + (t + 1) + " en " + timecode(gap.s));
+                    } catch (addError) { log.push("  No se pudo agregar Cross Dissolve en V" + (t + 1) + ": " + addError); }
+                    break;
+                }
+            }
+            return added;
+        }
 
         var first = snapshot();
         if (!first.videoClips) fail("La secuencia no tiene clips de video.");
@@ -165,7 +200,7 @@ Ejecutar sobre una COPIA de la secuencia.
             } catch (syncError) { log.push("No se pudo revisar el bloqueo de sincronizacion: " + syncError); }
         }
 
-        var done = 0, removed = 0, skipped = [], guard = first.gaps.length + 2;
+        var done = 0, removed = 0, transitions = 0, skipped = [], guard = first.gaps.length + 2;
         while (guard-- > 0) {
             var now = snapshot();
             var index = now.gaps.length - 1 - skipped.length;   // del ultimo al primero
@@ -195,6 +230,7 @@ Ejecutar sobre una COPIA de la secuencia.
                               : "No pude deshacerlo: pulsa Ctrl+Z una vez.") +
                     "\nTramos cerrados correctamente antes: " + done + ".");
             }
+            transitions += addCrossDissolves(now, gap);
             log.push("  extraido y comprobado");
             done++;
             removed += gap.e - gap.s;
@@ -203,6 +239,7 @@ Ejecutar sobre una COPIA de la secuencia.
         report("Tramos sin video cerrados: " + done + " de " + first.gaps.length +
             "\nTiempo quitado: " + (removed / fps).toFixed(1) + " s" +
             "\nDuracion: " + (first.end / fps).toFixed(1) + " s -> " + (last.end / fps).toFixed(1) + " s" +
+            "\nCross Dissolve agregados: " + transitions + " (solo donde el hueco unia dos videos)." +
             "\nCada clip de video y audio quedo donde debia tras cada extraccion." +
             (skipped.length ? "\n\nPremiere no extrajo " + skipped.length + " tramo(s): " + skipped.join("; ") : "") +
             "\n\nLos subtitulos los corre Premiere y un script no puede leerlos: dales un vistazo.");
