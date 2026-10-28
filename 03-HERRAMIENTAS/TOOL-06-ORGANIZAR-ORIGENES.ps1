@@ -43,11 +43,14 @@ param(
     [switch]$Confirmar,
     [string]$CarpetaRezagados = 'Rezagados',
     [datetime]$Desde = [datetime]::MinValue,
-    [datetime]$Hasta = [datetime]::MaxValue
+    [datetime]$Hasta = [datetime]::MaxValue,
+    # Permite al lanzador grafico leer exactamente el plan generado.
+    [string]$PlanCsv
 )
 
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $RepoRoot) { $RepoRoot = $PSScriptRoot }
 $LogDir = Join-Path $RepoRoot 'logs'
 $Stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $Inv = [Globalization.CultureInfo]::InvariantCulture
@@ -402,7 +405,7 @@ if ($problems.Count) {
     Write-Host "Listado de inconvenientes: $problemPath"
 }
 
-$planPath = Join-Path $LogDir "organizador_plan_$Stamp.csv"
+$planPath = if ($PlanCsv) { $PlanCsv } else { Join-Path $LogDir "organizador_plan_$Stamp.csv" }
 Write-Journal $plan $planPath
 $toMove = @($plan | Where-Object { $_.Estado -eq 'MOVER' })
 Write-Host ''
