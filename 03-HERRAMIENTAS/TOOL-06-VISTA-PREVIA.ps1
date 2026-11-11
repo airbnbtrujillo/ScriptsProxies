@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$VerificarInterfaz)
+param(
+    [string]$VolumeLabel = '06',
+    [switch]$VerificarInterfaz
+)
 
 $ErrorActionPreference = 'Stop'
 $scriptPath = Join-Path $PSScriptRoot 'TOOL-06-ORGANIZAR-ORIGENES.ps1'
@@ -13,8 +16,27 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     throw "No se encontro el organizador: $scriptPath"
 }
 
+Add-Type -AssemblyName System.Windows.Forms
+$volumes = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
+    $_.VolumeName -eq $VolumeLabel -and $_.DeviceID -match '^[A-Z]:$'
+})
+if ($volumes.Count -ne 1) {
+    $message = if ($volumes.Count -eq 0) {
+        "No se encontro el disco llamado '$VolumeLabel'. Conectalo y vuelve a abrir el CMD."
+    } else {
+        "Hay varios discos llamados '$VolumeLabel'. Cambia el nombre de uno antes de continuar."
+    }
+    Write-Host $message -ForegroundColor Red
+    if (-not $VerificarInterfaz) {
+        [void][System.Windows.Forms.MessageBox]::Show($message, 'Organizador de origenes', 'OK', 'Warning')
+    }
+    exit 2
+}
+$targetVolume = $volumes[0]
+$rootPath = $targetVolume.DeviceID + '\'
+Write-Host "Disco seleccionado: $rootPath (nombre: $VolumeLabel)" -ForegroundColor Cyan
 Write-Host 'Preparando la vista previa de los cambios...' -ForegroundColor Cyan
-& $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -PlanCsv $planPath
+& $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Root $rootPath -PlanCsv $planPath
 if ($LASTEXITCODE -ne 0) { throw "El analisis fallo (codigo $LASTEXITCODE). No se aplicaron cambios." }
 
 $plan = @()
@@ -24,12 +46,11 @@ if (Test-Path -LiteralPath $planPath -PathType Leaf) {
 $movibles = @($plan | Where-Object { $_.Estado -eq 'MOVER' })
 $sinMover = @($plan | Where-Object { $_.Estado -ne 'MOVER' })
 
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'Organizador de origenes - vista previa'
+$form.Text = "Organizador de origenes - disco $VolumeLabel ($rootPath)"
 $form.StartPosition = 'CenterScreen'
 $form.Size = New-Object System.Drawing.Size(1220, 720)
 $form.MinimumSize = New-Object System.Drawing.Size(900, 500)
@@ -49,7 +70,7 @@ $header.Dock = 'Top'
 $header.Height = 70
 $header.Padding = New-Object System.Windows.Forms.Padding(14, 12, 14, 4)
 $header.Font = New-Object System.Drawing.Font('Segoe UI', 11, [System.Drawing.FontStyle]::Bold)
-$header.Text = "CAMBIOS PREVISTOS: $($movibles.Count) movimientos   |   $($sinMover.Count) sin mover`r`nRevisa las rutas de origen y destino antes de continuar."
+$header.Text = "DISCO $VolumeLabel ($rootPath): $($movibles.Count) movimientos   |   $($sinMover.Count) sin mover`r`nRevisa las rutas de origen y destino antes de continuar."
 $layout.Controls.Add($header, 0, 0)
 
 $footer = New-Object System.Windows.Forms.Panel
@@ -137,6 +158,13 @@ if ($respuesta.Trim() -ne 'APLICAR') {
     return
 }
 
+$currentVolume = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
+    $_.DeviceID -eq $targetVolume.DeviceID -and $_.VolumeName -eq $VolumeLabel -and
+    $_.VolumeSerialNumber -eq $targetVolume.VolumeSerialNumber
+})
+if ($currentVolume.Count -ne 1) {
+    throw "El disco '$VolumeLabel' cambio desde la vista previa. Abre de nuevo el CMD antes de aplicar."
+}
 Write-Host 'Ejecutando el organizador...' -ForegroundColor Cyan
-& $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Aplicar
+& $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Root $rootPath -Aplicar
 if ($LASTEXITCODE -ne 0) { throw "La ejecucion termino con codigo $LASTEXITCODE. Revisa el registro de movimientos." }
