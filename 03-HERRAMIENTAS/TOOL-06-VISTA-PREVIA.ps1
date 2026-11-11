@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$VolumeLabel = '06',
+    [string]$Entrada,
+    [string]$VolumeLabel,
     [switch]$VerificarInterfaz
 )
 
@@ -17,24 +18,56 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
 }
 
 Add-Type -AssemblyName System.Windows.Forms
-$volumes = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
-    $_.VolumeName -eq $VolumeLabel -and $_.DeviceID -match '^[A-Z]:$'
-})
-if ($volumes.Count -ne 1) {
-    $message = if ($volumes.Count -eq 0) {
-        "No se encontro el disco llamado '$VolumeLabel'. Conectalo y vuelve a abrir el CMD."
-    } else {
-        "Hay varios discos llamados '$VolumeLabel'. Cambia el nombre de uno antes de continuar."
-    }
+function Stop-WithMessage([string]$message) {
     Write-Host $message -ForegroundColor Red
     if (-not $VerificarInterfaz) {
         [void][System.Windows.Forms.MessageBox]::Show($message, 'Organizador de origenes', 'OK', 'Warning')
     }
     exit 2
 }
-$targetVolume = $volumes[0]
-$rootPath = $targetVolume.DeviceID + '\'
-Write-Host "Disco seleccionado: $rootPath (nombre: $VolumeLabel)" -ForegroundColor Cyan
+
+if (-not $Entrada -and -not $VolumeLabel) {
+    Write-Host 'Escribe la carpeta principal que contiene tus proyectos y carpetas de camaras.' -ForegroundColor Cyan
+    Write-Host 'Ejemplos: G:\  |  H:\Grabaciones  |  06 (nombre del disco)'
+    $Entrada = Read-Host 'Ruta o nombre del disco'
+}
+$selection = if ($Entrada) { $Entrada.Trim().Trim('"') } else { $VolumeLabel.Trim() }
+if (-not $selection) { Stop-WithMessage 'No se indico ningun disco o carpeta.' }
+if ($selection -match '^[A-Za-z]:?$') { $selection = $selection.Substring(0, 1) + ':\' }
+
+$selectedByLabel = -not [IO.Path]::IsPathRooted($selection)
+$targetVolume = $null
+if ($selectedByLabel) {
+    $volumes = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
+        $_.VolumeName -eq $selection -and $_.DeviceID -match '^[A-Z]:$'
+    })
+    if ($volumes.Count -ne 1) {
+        $message = if ($volumes.Count -eq 0) {
+            "No se encontro el disco llamado '$selection'. Conectalo o escribe su ruta completa."
+        } else {
+            "Hay varios discos llamados '$selection'. Escribe la ruta exacta, por ejemplo G:\."
+        }
+        Stop-WithMessage $message
+    }
+    $targetVolume = $volumes[0]
+    $rootPath = $targetVolume.DeviceID + '\'
+    $sourceDescription = "DISCO $selection ($rootPath)"
+} else {
+    if (-not (Test-Path -LiteralPath $selection -PathType Container)) {
+        Stop-WithMessage "La carpeta o disco no existe: $selection"
+    }
+    $rootPath = (Get-Item -LiteralPath $selection).FullName
+    $sourceDescription = "RUTA $rootPath"
+    $driveId = [IO.Path]::GetPathRoot($rootPath).TrimEnd('\')
+    $targetVolume = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
+        $_.DeviceID -eq $driveId
+    } | Select-Object -First 1)[0]
+}
+
+if (-not (Test-Path -LiteralPath $rootPath -PathType Container)) {
+    Stop-WithMessage "La ruta seleccionada no esta disponible: $rootPath"
+}
+Write-Host "Origen seleccionado: $sourceDescription" -ForegroundColor Cyan
 Write-Host 'Preparando la vista previa de los cambios...' -ForegroundColor Cyan
 & $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Root $rootPath -PlanCsv $planPath
 if ($LASTEXITCODE -ne 0) { throw "El analisis fallo (codigo $LASTEXITCODE). No se aplicaron cambios." }
@@ -50,7 +83,7 @@ Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Organizador de origenes - disco $VolumeLabel ($rootPath)"
+$form.Text = "Organizador de origenes - $sourceDescription"
 $form.StartPosition = 'CenterScreen'
 $form.Size = New-Object System.Drawing.Size(1220, 720)
 $form.MinimumSize = New-Object System.Drawing.Size(900, 500)
@@ -70,7 +103,7 @@ $header.Dock = 'Top'
 $header.Height = 70
 $header.Padding = New-Object System.Windows.Forms.Padding(14, 12, 14, 4)
 $header.Font = New-Object System.Drawing.Font('Segoe UI', 11, [System.Drawing.FontStyle]::Bold)
-$header.Text = "DISCO $VolumeLabel ($rootPath): $($movibles.Count) movimientos   |   $($sinMover.Count) sin mover`r`nRevisa las rutas de origen y destino antes de continuar."
+$header.Text = "$sourceDescription`: $($movibles.Count) movimientos   |   $($sinMover.Count) sin mover`r`nRevisa las rutas de origen y destino antes de continuar."
 $layout.Controls.Add($header, 0, 0)
 
 $footer = New-Object System.Windows.Forms.Panel
@@ -158,12 +191,18 @@ if ($respuesta.Trim() -ne 'APLICAR') {
     return
 }
 
-$currentVolume = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
-    $_.DeviceID -eq $targetVolume.DeviceID -and $_.VolumeName -eq $VolumeLabel -and
-    $_.VolumeSerialNumber -eq $targetVolume.VolumeSerialNumber
-})
-if ($currentVolume.Count -ne 1) {
-    throw "El disco '$VolumeLabel' cambio desde la vista previa. Abre de nuevo el CMD antes de aplicar."
+if (-not (Test-Path -LiteralPath $rootPath -PathType Container)) {
+    throw "La ruta $rootPath ya no esta disponible. Abre de nuevo el CMD antes de aplicar."
+}
+if ($targetVolume) {
+    $currentVolume = @(Get-CimInstance Win32_LogicalDisk | Where-Object {
+        $_.DeviceID -eq $targetVolume.DeviceID -and
+        $_.VolumeSerialNumber -eq $targetVolume.VolumeSerialNumber -and
+        (-not $selectedByLabel -or $_.VolumeName -eq $selection)
+    })
+    if ($currentVolume.Count -ne 1) {
+        throw 'El disco cambio desde la vista previa. Abre de nuevo el CMD antes de aplicar.'
+    }
 }
 Write-Host 'Ejecutando el organizador...' -ForegroundColor Cyan
 & $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Root $rootPath -Aplicar
