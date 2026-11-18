@@ -105,11 +105,12 @@ El reloj del microfono TX02 va adelantado; por eso sus archivos se fechan restan
 
 ## Scripts para Premiere
 
-Se ejecutan dentro de Premiere, sobre la secuencia activa. Conviene usarlos sobre una copia de la secuencia.
+Se ejecutan dentro de Premiere. Los scripts 01 a 03 usan la secuencia activa; el 04 revisa todas las secuencias. Conviene trabajar sobre una copia guardada del proyecto.
 
 - `PPRO-01-CORTAR-AUDIO-POR-SRT.jsx`: en una pista de audio duplicada, conserva solo lo que cae dentro de los intervalos de un SRT.
 - `PPRO-02-CERRAR-HUECOS-SIN-VIDEO.jsx`: busca los tramos donde ninguna pista tiene video y le pide a Premiere que los extraiga, del ultimo al primero y sin preguntar. Premiere corre todas las pistas a la vez, tambien las de subtitulos, que un script no puede leer ni mover. Antes de cada extraccion calcula donde debe quedar cada clip de video y audio y despues lo comprueba; si no coincide, deshace ese paso y se detiene.
 - `PPRO-03-DIAGNOSTICO-API.jsx`: no modifica nada; lista las funciones que esa version de Premiere ofrece a los scripts.
+- `PPRO-04-REEMPLAZAR-DJI-SBS-Y-PROXIES.jsx`: detecta CAM_001 junto al proyecto o a partir de la ruta del medio, reemplaza los medios DJI VR180 que apuntan al proxy por el SBS de igual nombre, adjunta el proxy correspondiente y fija Movimiento > Escala en 100 para sus clips en todas las secuencias. Omite escalas animadas y parejas incompletas. Genera un informe; revisalo antes de guardar. No modifica archivos en disco.
 
 Cada uno deja su informe junto al script. `pruebas\simular-cerrar-huecos.js` prueba `PPRO-02` fuera de Premiere con `node`.
 
